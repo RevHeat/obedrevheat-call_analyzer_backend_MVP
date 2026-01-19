@@ -3,6 +3,7 @@ import app from "./app";
 import { sequelize } from "./db/sequelizeSetup";
 import { setupAssociations } from "./db/models/associations";
 
+
 const PORT = Number(process.env.PORT || 4000);
 
 (async () => {
