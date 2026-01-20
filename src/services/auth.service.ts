@@ -37,8 +37,7 @@ async function ensureUniqueOrgSlug(baseSlug: string, t: Transaction) {
     const exists = await Organization.findOne({
       where: { slug: candidate },
       transaction: t,
-      // NOTE: lock helps in concurrency, but only if the row exists.
-      // Still ok to keep; unique constraint on slug is the real guard.
+    
       lock: t.LOCK.UPDATE,
     });
 
@@ -159,47 +158,29 @@ export class AuthService {
     };
   }
 
-  // -------------------------
-  // REFRESH (rotating tokens)
-  // -------------------------
-  static async refresh(refreshToken: string) {
-    const token_hash = hashToken(refreshToken);
+static async refresh(refreshToken: string) {
+  const token_hash = hashToken(refreshToken);
 
-    return await sequelize.transaction(async (t) => {
-      const existing = await RefreshToken.findOne({
-        where: { token_hash },
-        transaction: t,
-        lock: t.LOCK.UPDATE,
-      });
+  const row = await RefreshToken.findOne({ where: { token_hash } });
+  if (!row) throw new Error("Invalid refresh token");
+  if (row.revoked_at) throw new Error("Refresh token revoked");
+  if (row.expires_at.getTime() <= Date.now()) throw new Error("Refresh token expired");
 
-      if (!existing) throw new Error("Invalid refresh token");
-      if (existing.revoked_at) throw new Error("Refresh token revoked");
-      if (existing.expires_at.getTime() <= Date.now()) throw new Error("Refresh token expired");
+  row.expires_at = refreshExpiryDate();
+  await row.save();
 
-      const new_refresh_token = newOpaqueToken();
-      const new_hash = hashToken(new_refresh_token);
+  const access_token = signAccessToken({ userId: row.user_id });
 
-      const newRow = await RefreshToken.create(
-        {
-          user_id: existing.user_id,
-          token_hash: new_hash,
-          expires_at: refreshExpiryDate(),
-          revoked_at: null,
-          replaced_by_token_id: null,
-        },
-        { transaction: t }
-      );
+  const user = await User.findByPk(row.user_id);
+  if (!user) throw new Error("User not found");
 
-      await existing.update(
-        { revoked_at: new Date(), replaced_by_token_id: newRow.id },
-        { transaction: t }
-      );
+  return {
+    access_token,
+    refresh_token: refreshToken, // ✅ mismo token
+    user: { id: user.id, email: user.email },
+  };
+}
 
-      const access_token = signAccessToken({ userId: existing.user_id });
-
-      return { access_token, refresh_token: new_refresh_token };
-    });
-  }
 
  
   static async logout(refreshToken: string) {

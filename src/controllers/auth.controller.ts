@@ -104,28 +104,29 @@ export class AuthController {
     }
   }
 
-  // -------------------------
-  // REFRESH
-  // -------------------------
-  static async refresh(req: Request, res: Response) {
-    try {
-      const token = getRefreshCookie(req);
-      if (!token) return res.status(401).json({ ok: false, error: "Missing refresh token" });
+static async refresh(req: Request, res: Response) {
+  try {
+    const token = getRefreshCookie(req);
+    if (!token) return res.status(401).json({ ok: false, error: "Missing refresh token" });
 
-      const result = await AuthService.refresh(token);
+    const result = await AuthService.refresh(token);
 
-      // rotate cookie
-      setRefreshCookie(res, result.refresh_token);
+    setRefreshCookie(res, result.refresh_token);
 
-      return res.status(200).json({
-        ok: true,
-        data: { access_token: result.access_token },
-      });
-    } catch (e: any) {
-      clearRefreshCookie(res);
-      return res.status(401).json({ ok: false, error: e?.message ?? "Refresh failed" });
-    }
+    return res.status(200).json({
+      ok: true,
+      data: {
+        access_token: result.access_token,
+        user: result.user,
+      },
+    });
+  } catch (e: any) {
+    clearRefreshCookie(res);
+    return res.status(401).json({ ok: false, error: e?.message ?? "Refresh failed" });
   }
+}
+
+
 
   static async logout(req: Request, res: Response) {
     try {
