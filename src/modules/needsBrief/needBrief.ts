@@ -1,5 +1,5 @@
 import { llm } from "../../config/llm";
-import { NEEDS_BRIEF_PROMPT } from "./needsBrief.prompt";
+import { needsBriefPrompt } from "./needsBrief.prompt";
 import { NeedsBriefResponseSchema } from "./needsBrief.schema";
 
 type NeedsBriefParams = {
@@ -17,7 +17,7 @@ export async function runNeedsBrief(params: NeedsBriefParams) {
     { name: "NeedsBrief" }
   );
 
-  const chain = NEEDS_BRIEF_PROMPT.pipe(structuredLlm);
+  const chain = needsBriefPrompt.pipe(structuredLlm);
 
   return chain.invoke({
     transcript: params.transcript,
