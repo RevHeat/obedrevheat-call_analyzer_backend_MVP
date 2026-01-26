@@ -93,12 +93,6 @@ Transcript:
 Call Type:
 {callType}
 
-Deal Size:
-{dealSize}
-
-Rep Experience:
-{repExperience}
-
 Analysis Focus:
 {analysisFocus}
 

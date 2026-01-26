@@ -5,8 +5,6 @@ import { NeedsBriefResponseSchema } from "../../../modules/needsBrief/needsBrief
 export async function runNeedsBriefChain(input: {
   transcript: string;
   callType?: string | null;
-  dealSize?: string | null;
-  repExperience?: string | null;
   analysisFocus?: string | null;
   priorContext?: string | null;
 }) {
@@ -17,8 +15,6 @@ export async function runNeedsBriefChain(input: {
   return chain.invoke({
     transcript: input.transcript,
     callType: input.callType ?? null,
-    dealSize: input.dealSize ?? null,
-    repExperience: input.repExperience ?? null,
     analysisFocus: input.analysisFocus ?? null,
     priorContext: input.priorContext ?? null,
   });
