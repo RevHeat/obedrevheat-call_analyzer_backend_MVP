@@ -12,10 +12,18 @@ export async function runDiscoveryQualityChain(input: {
     llm.withStructuredOutput(DiscoveryQualityResponseSchema, { name: "DiscoveryQuality" })
   );
 
-  return chain.invoke({
+  const res: any = await chain.invoke({
     transcript: input.transcript,
     callType: input.callType ?? null,
     analysisFocus: input.analysisFocus ?? null,
     priorContext: input.priorContext ?? null,
   });
+
+  const normalized: any = {
+    ...res,
+    heresWhatHappened: res?.heresWhatHappened ?? res?.brutalTruth,
+  };
+  delete normalized.brutalTruth;
+
+  return DiscoveryQualityResponseSchema.parse(normalized);
 }

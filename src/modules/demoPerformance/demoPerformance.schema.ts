@@ -1,3 +1,4 @@
+// backend/src/schemas/demoPerformance.schema.ts
 import { z } from "zod";
 
 export const CallTypeSchema = z.enum([
@@ -116,7 +117,7 @@ export const DemoPerformanceResponseSchema = z.object({
 
   whatRepDoesWell: z.array(RepStrengthSchema).min(1).max(4),
 
-  brutalTruth: z.string().min(1).max(900),
+  heresWhatHappened: z.string().min(1).max(900),
 
   nextCallMustAccomplish: z.array(z.string().min(1).max(240)).min(1).max(4),
   recommendedNextStep: z.string().min(1).max(360),

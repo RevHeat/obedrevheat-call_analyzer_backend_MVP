@@ -122,7 +122,6 @@ export const PrioritySchema = z.object({
   theGap: z.string().min(1).max(520),
   whyThisKillsDeals: z.string().min(1).max(360),
   theFix: z.array(z.string().min(1).max(240)).min(1).max(4),
-  practiceThis: z.array(z.string().min(1).max(520)).min(1).max(3),
   evidence: z.array(EvidenceSchema).min(0).max(3),
 });
 
@@ -147,7 +146,7 @@ export const NeedsBriefResponseSchema = z.object({
   autoFlags: z.array(AutoFlagSchema).min(0).max(4),
   topPriorities: z.array(PrioritySchema).length(3),
   whatRepDoesWell: z.array(RepStrengthSchema).min(1).max(4),
-  brutalTruth: z.string().min(1).max(900),
+  heresWhatHappened: z.string().min(1).max(900),
   nextCallMustAccomplish: z.array(z.string().min(1).max(240)).min(1).max(4),
   recommendedNextStep: z.string().min(1).max(360),
   openNextCallWith: z.string().min(1).max(240),
