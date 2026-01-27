@@ -1,6 +1,10 @@
 import { llm } from "../../config/llm";
 import { needsBriefPrompt } from "./needsBrief.prompt";
-import { NeedsBriefResponseSchema } from "./needsBrief.schema";
+import {
+  NeedsBriefAutoFlagLabels,
+  NeedsBriefResponseSchema,
+  type NeedsBriefAutoFlagKey,
+} from "./needsBrief.schema";
 
 type NeedsBriefParams = {
   transcript: string;
@@ -26,7 +30,17 @@ export async function runNeedsBrief(params: NeedsBriefParams) {
   const normalized: any = {
     ...res,
     heresWhatHappened: res?.heresWhatHappened ?? res?.brutalTruth,
+    autoFlags: Array.isArray(res?.autoFlags)
+      ? res.autoFlags.map((f: any) => {
+          const key = f?.key as NeedsBriefAutoFlagKey;
+          return {
+            ...f,
+            label: f?.label ?? NeedsBriefAutoFlagLabels[key] ?? f?.key,
+          };
+        })
+      : [],
   };
+
   delete normalized.brutalTruth;
 
   return NeedsBriefResponseSchema.parse(normalized);

@@ -67,9 +67,21 @@ export const AutoFlagKeySchema = z.enum([
   "NO_PATH_TO_DECISION",
 ]);
 
+export type DemoAutoFlagKey = z.infer<typeof AutoFlagKeySchema>;
+
+export const DemoAutoFlagLabelSchema = z.record(AutoFlagKeySchema, z.string().min(1).max(48));
+
+export const DemoAutoFlagLabels = {
+  VALUE_FOCUS_BELOW_14: "Weak value focus",
+  IMPACT_DEMONSTRATION_BELOW_14: "Weak impact demo",
+  FEATURE_TOUR: "Feature tour",
+  NO_PATH_TO_DECISION: "No decision path",
+} satisfies Record<DemoAutoFlagKey, string>;
+
 export const AutoFlagSchema = z.object({
   key: AutoFlagKeySchema,
   severity: z.enum(["CRITICAL", "HIGH"]),
+  label: z.string().min(1).max(48),
   message: z.string().min(1).max(320),
   evidence: z.array(EvidenceSchema).min(0).max(2),
 });

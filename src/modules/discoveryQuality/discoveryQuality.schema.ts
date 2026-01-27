@@ -65,9 +65,24 @@ export const AutoFlagKeySchema = z.enum([
   "PREMATURE_PITCHING",
 ]);
 
+export type DiscoveryAutoFlagKey = z.infer<typeof AutoFlagKeySchema>;
+
+export const DiscoveryAutoFlagLabelSchema = z.record(
+  AutoFlagKeySchema,
+  z.string().min(1).max(48)
+);
+
+export const DiscoveryAutoFlagLabels = {
+  DISCOVERY_DEPTH_BELOW_22: "Shallow discovery",
+  STRATEGIC_POSITIONING_BELOW_12: "Weak positioning",
+  ACCEPTED_VAGUE_ANSWERS: "Let vagueness slide",
+  PREMATURE_PITCHING: "Pitched too early",
+} satisfies Record<DiscoveryAutoFlagKey, string>;
+
 export const AutoFlagSchema = z.object({
   key: AutoFlagKeySchema,
   severity: z.enum(["CRITICAL", "HIGH"]),
+  label: z.string().min(1).max(48),
   message: z.string().min(1).max(320),
   evidence: z.array(EvidenceSchema).min(0).max(2),
 });

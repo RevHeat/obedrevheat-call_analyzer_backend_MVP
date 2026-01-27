@@ -106,9 +106,24 @@ export const AutoFlagKeySchema = z.enum([
   "PREMATURE_PRESCRIPTION",
 ]);
 
+export type NeedsBriefAutoFlagKey = z.infer<typeof AutoFlagKeySchema>;
+
+export const NeedsBriefAutoFlagLabelSchema = z.record(
+  AutoFlagKeySchema,
+  z.string().min(1).max(48)
+);
+
+export const NeedsBriefAutoFlagLabels = {
+  COST_OF_INACTION_BELOW_12: "Weak urgency",
+  BUSINESS_IMPACT_BELOW_10: "No business case",
+  STRATEGIC_IMPORTANCE_BELOW_9: "Not strategic",
+  PREMATURE_PRESCRIPTION: "Solution too early",
+} satisfies Record<NeedsBriefAutoFlagKey, string>;
+
 export const AutoFlagSchema = z.object({
   key: AutoFlagKeySchema,
   severity: z.enum(["CRITICAL", "HIGH"]),
+  label: z.string().min(1).max(48),
   message: z.string().min(1).max(320),
   evidence: z.array(EvidenceSchema).min(0).max(2),
 });
