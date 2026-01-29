@@ -47,6 +47,7 @@ async function ensureUniqueOrgSlug(baseSlug: string, t: Transaction) {
   throw new Error("Could not generate a unique workspace slug");
 }
 
+// Creates the token that we send to the frontend for validation
 function signAccessToken(payload: { userId: string }) {
   return jwt.sign(payload, JWT_ACCESS_SECRET, { expiresIn: ACCESS_TTL_SECONDS });
 }

@@ -2,6 +2,8 @@ import { User } from "./User";
 import { Organization } from "./Organization";
 import { OrganizationMember } from "./OrganizationMember";
 import { RefreshToken } from "./RefreshToken";
+import { Feedback } from "./Feedback";
+
 
 export const setupAssociations = () => {
   /**
@@ -58,7 +60,7 @@ export const setupAssociations = () => {
   User.hasMany(RefreshToken, {
     foreignKey: "user_id",
     as: "refresh_tokens",
-    onDelete: "CASCADE", // 🔐 borrar tokens al borrar user
+    onDelete: "CASCADE", 
     onUpdate: "CASCADE",
   });
 
@@ -67,3 +69,17 @@ export const setupAssociations = () => {
     as: "user",
   });
 };
+  /**
+   * User ↔ Feedback
+   */
+  User.hasMany(Feedback, {
+    foreignKey: "created_by_user_id",
+    as: "feedback",
+    onDelete: "RESTRICT",
+    onUpdate: "CASCADE",
+  });
+
+  Feedback.belongsTo(User, {
+    foreignKey: "created_by_user_id",
+    as: "created_by",
+  });
