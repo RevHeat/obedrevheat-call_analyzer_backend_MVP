@@ -21,8 +21,8 @@ export class Organization
   declare current_period_end?: Date | null;
   declare seats_limit?: number | null;
 
-  declare created_at?: Date;
-  declare updated_at?: Date;
+  // declare created_at?: Date;
+  // declare updated_at?: Date;
 }
 
 Organization.init(
@@ -76,15 +76,15 @@ Organization.init(
     },
 
     // timestamps (if you already have them explicitly in your model)
-    created_at: {
-      type: DataTypes.DATE,
-      allowNull: false,
-    },
+    // created_at: {
+    //   type: DataTypes.DATE,
+    //   allowNull: false,
+    // },
 
-    updated_at: {
-      type: DataTypes.DATE,
-      allowNull: false,
-    },
+    // updated_at: {
+    //   type: DataTypes.DATE,
+    //   allowNull: false,
+    // },
   },
   {
     sequelize,

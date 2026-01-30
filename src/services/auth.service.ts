@@ -7,6 +7,7 @@ import { User } from "../db/models/User";
 import { Organization } from "../db/models/Organization";
 import { OrganizationMember } from "../db/models/OrganizationMember";
 import { RefreshToken } from "../db/models/RefreshToken";
+import { PLAN_KEYS, SUBSCRIPTION_STATUSES, PLAN_SEATS_LIMIT } from "../constants/billing";
 
 type RegisterInput = {
   email: string;
@@ -17,6 +18,10 @@ type RegisterInput = {
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "dev-secret-change-me";
 const ACCESS_TTL_SECONDS = Number(process.env.ACCESS_TOKEN_TTL_SECONDS || 900); // 15m
 const REFRESH_TTL_DAYS = Number(process.env.REFRESH_TOKEN_TTL_DAYS || 30);
+
+const TRIAL_DAYS = Number(process.env.TRIAL_DAYS || 14);
+const trialEnds = new Date();
+trialEnds.setDate(trialEnds.getDate() + TRIAL_DAYS);
 
 function slugify(input: string) {
   return input
@@ -101,14 +106,20 @@ export class AuthService {
       const baseSlug = slugify(input.workspaceName);
       const slug = await ensureUniqueOrgSlug(baseSlug, t);
 
-      const org = await Organization.create(
-        {
-          name: input.workspaceName,
-          slug,
-          created_by_user_id: user.id,
-        },
-        { transaction: t }
-      );
+     const org = await Organization.create(
+          {
+            name: input.workspaceName,
+            slug,
+            created_by_user_id: user.id,
+
+            // billing defaults
+            plan_key: PLAN_KEYS.TRIAL,
+            subscription_status: SUBSCRIPTION_STATUSES.TRIALING,
+            trial_ends_at: trialEnds,
+            seats_limit: PLAN_SEATS_LIMIT[PLAN_KEYS.TRIAL],
+          },
+          { transaction: t }
+        );
 
       await OrganizationMember.create(
         {
