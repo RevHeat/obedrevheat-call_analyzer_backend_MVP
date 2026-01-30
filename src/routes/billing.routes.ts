@@ -1,17 +1,16 @@
 import { Router } from "express";
-import { analyzeController } from "../controllers/analyze.controller";
+import { getBillingStatusController } from "../controllers/billing.controller";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireOrgContext } from "../middlewares/requireOrgContext";
-import { requireActiveSubscription } from "../middlewares/requireActiveSubscription";
 
 const router = Router();
 
-router.post(
-  "/analyze",
+// GET /api/billing/status
+router.get(
+  "/billing/status",
   requireAuth,
   requireOrgContext,
-  requireActiveSubscription,
-  analyzeController
+  getBillingStatusController
 );
 
 export default router;

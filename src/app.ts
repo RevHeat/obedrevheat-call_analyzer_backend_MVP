@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import analyzeRoutes from "./routes/analyze.routes";
 import authRoutes from "./routes/auth.routes";
 import feedbackRoutes from "./routes/feedback.routes";
+import billingRoutes from "./routes/billing.routes";
 
 const app = express();
 
@@ -25,6 +26,8 @@ app.use(cookieParser());
 app.use("/api", authRoutes);
 app.use("/api", analyzeRoutes);
 app.use("/api", feedbackRoutes);
+app.use("/api", billingRoutes);
+
 
 
 app.get("/health", (_req: Request, res: Response) => {
