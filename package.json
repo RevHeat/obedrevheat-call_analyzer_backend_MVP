@@ -27,6 +27,7 @@
     "pg": "^8.17.1",
     "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.7",
+    "stripe": "^20.3.0",
     "zod": "^4.3.5"
   },
   "devDependencies": {

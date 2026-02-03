@@ -6,6 +6,7 @@ import {
   getBillingStatusController,
   createCheckoutSessionController,
   createBillingPortalSessionController,
+  syncBillingController,
 } from "../controllers/billing.controller";
 
 const router = Router();
@@ -15,5 +16,8 @@ router.get("/billing/status", requireAuth, requireOrgContext, getBillingStatusCo
 router.post("/billing/checkout", requireAuth, requireOrgContext, createCheckoutSessionController);
 
 router.post("/billing/portal", requireAuth, requireOrgContext, createBillingPortalSessionController);
+router.post("/billing/sync", requireAuth, requireOrgContext, syncBillingController);
+
+
 
 export default router;

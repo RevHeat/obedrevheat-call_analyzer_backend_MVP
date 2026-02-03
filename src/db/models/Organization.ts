@@ -23,6 +23,9 @@ export class Organization
 
   // declare created_at?: Date;
   // declare updated_at?: Date;
+  // Billing (Stripe)
+  declare stripe_customer_id?: string | null;
+  declare stripe_subscription_id?: string | null;
 }
 
 Organization.init(
@@ -74,6 +77,17 @@ Organization.init(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    
+    stripe_customer_id: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  stripe_subscription_id: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
 
     // timestamps (if you already have them explicitly in your model)
     // created_at: {
