@@ -3,7 +3,7 @@ import { Organization } from "./Organization";
 import { OrganizationMember } from "./OrganizationMember";
 import { RefreshToken } from "./RefreshToken";
 import { Feedback } from "./Feedback";
-
+import { AnalysisRun } from "./AnalysisRun";
 
 export const setupAssociations = () => {
   /**
@@ -60,7 +60,7 @@ export const setupAssociations = () => {
   User.hasMany(RefreshToken, {
     foreignKey: "user_id",
     as: "refresh_tokens",
-    onDelete: "CASCADE", 
+    onDelete: "CASCADE",
     onUpdate: "CASCADE",
   });
 
@@ -68,7 +68,7 @@ export const setupAssociations = () => {
     foreignKey: "user_id",
     as: "user",
   });
-};
+
   /**
    * User ↔ Feedback
    */
@@ -83,3 +83,34 @@ export const setupAssociations = () => {
     foreignKey: "created_by_user_id",
     as: "created_by",
   });
+
+  /**
+   * Organization ↔ AnalysisRun
+   */
+  Organization.hasMany(AnalysisRun, {
+    foreignKey: "org_id",
+    as: "analysis_runs",
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  });
+
+  AnalysisRun.belongsTo(Organization, {
+    foreignKey: "org_id",
+    as: "organization",
+  });
+
+  /**
+   * User ↔ AnalysisRun
+   */
+  User.hasMany(AnalysisRun, {
+    foreignKey: "user_id",
+    as: "analysis_runs",
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  });
+
+  AnalysisRun.belongsTo(User, {
+    foreignKey: "user_id",
+    as: "user",
+  });
+};
