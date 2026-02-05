@@ -1,5 +1,10 @@
 import { Request, Response } from "express";
 import { AuthService } from "../services/auth.service";
+import { PasswordResetService } from "../services/passwordReset.service";
+import { User } from "../db/models/User";
+import { EmailService } from "../services/email.service";
+
+
 
 function getRefreshCookie(req: Request) {
   return (req as any).cookies?.refresh_token as string | undefined;
@@ -140,4 +145,54 @@ static async refresh(req: Request, res: Response) {
       return res.status(200).json({ ok: true });
     }
   }
+
+  static async forgotPassword(req: Request, res: Response) {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await User.findOne({ where: { email } });
+
+      if (user) {
+        const token = await PasswordResetService.createResetTokenForUser(user);
+
+        const appBaseUrl = process.env.APP_BASE_URL || "http://localhost:3000";
+        const resetUrl = `${appBaseUrl.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(token)}`;
+
+        await EmailService.sendPasswordResetEmail({
+          to: user.email,
+          resetUrl,
+        });
+      }
+
+        return res.json({ ok: true });
+      }catch (err: any) {
+          console.error("forgotPassword error:", err?.name, err?.message);
+          if (err?.$metadata) console.error("AWS metadata:", err.$metadata);
+          return res.status(500).json({ message: "Internal server error" });
+        }
+    }
+
+static async resetPassword(req: Request, res: Response) {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res
+        .status(400)
+        .json({ message: "Token and newPassword are required" });
+    }
+
+    await PasswordResetService.resetPasswordWithToken(token, newPassword);
+
+    return res.json({ ok: true });
+  } catch (err: any) {
+    console.error("resetPassword error:", err);
+    return res.status(400).json({ message: err.message || "Invalid token" });
+  }
+}
+
 }

@@ -16,6 +16,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.982.0",
     "@langchain/core": "^1.1.13",
     "@langchain/openai": "^1.2.2",
     "argon2": "^0.44.0",

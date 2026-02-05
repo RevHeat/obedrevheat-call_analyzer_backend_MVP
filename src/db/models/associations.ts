@@ -4,6 +4,7 @@ import { OrganizationMember } from "./OrganizationMember";
 import { RefreshToken } from "./RefreshToken";
 import { Feedback } from "./Feedback";
 import { AnalysisRun } from "./AnalysisRun";
+import { PasswordResetToken } from "./PasswordResetToken";
 
 export const setupAssociations = () => {
   /**
@@ -113,4 +114,20 @@ export const setupAssociations = () => {
     foreignKey: "user_id",
     as: "user",
   });
+
+  /**
+ * User ↔ PasswordResetToken
+ */
+User.hasMany(PasswordResetToken, {
+  foreignKey: "user_id",
+  as: "password_reset_tokens",
+  onDelete: "CASCADE",
+  onUpdate: "CASCADE",
+});
+
+PasswordResetToken.belongsTo(User, {
+  foreignKey: "user_id",
+  as: "user",
+});
+
 };
