@@ -14,16 +14,15 @@ export class Organization
   declare slug: string;
   declare created_by_user_id?: string | null;
 
-  // Billing
+  // ===== Billing / Subscription =====
   declare plan_key?: string | null;
+  declare billing_interval?: "monthly" | "annual" | null;
   declare subscription_status?: string | null;
   declare trial_ends_at?: Date | null;
   declare current_period_end?: Date | null;
   declare seats_limit?: number | null;
 
-  // declare created_at?: Date;
-  // declare updated_at?: Date;
-  // Billing (Stripe)
+  // ===== Stripe =====
   declare stripe_customer_id?: string | null;
   declare stripe_subscription_id?: string | null;
 }
@@ -52,10 +51,21 @@ Organization.init(
       allowNull: true,
     },
 
-    // ===== Billing / Subscription (NEW) =====
+    // ===== Billing / Subscription =====
     plan_key: {
       type: DataTypes.STRING,
       allowNull: true,
+    },
+
+    billing_interval: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      validate: {
+        isIn: {
+          args: [["monthly", "annual"]],
+          msg: "billing_interval must be 'monthly' or 'annual'",
+        },
+      },
     },
 
     subscription_status: {
@@ -77,28 +87,17 @@ Organization.init(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
-    
+
+    // ===== Stripe =====
     stripe_customer_id: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
 
-  stripe_subscription_id: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-
-
-    // timestamps (if you already have them explicitly in your model)
-    // created_at: {
-    //   type: DataTypes.DATE,
-    //   allowNull: false,
-    // },
-
-    // updated_at: {
-    //   type: DataTypes.DATE,
-    //   allowNull: false,
-    // },
+    stripe_subscription_id: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
   },
   {
     sequelize,

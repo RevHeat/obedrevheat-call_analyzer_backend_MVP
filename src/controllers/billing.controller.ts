@@ -1,7 +1,7 @@
 // src/controllers/billing.controller.ts
 import { Request, Response } from "express";
 import { BillingService } from "../services/billing.service";
-
+import Stripe from "stripe";
 const billingService = new BillingService();
 
 
@@ -92,5 +92,34 @@ export async function syncBillingController(req: Request, res: Response) {
   }
 }
 
-// (para después)
-// export async function stripeWebhookController(req: Request, res: Response) { ... }
+export async function stripeWebhookController(req: Request, res: Response) {
+  try {
+    const sig = req.headers["stripe-signature"];
+    if (!sig || typeof sig !== "string") {
+      return res.status(400).send("Missing Stripe signature");
+    }
+
+    const secret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!secret) {
+      console.error("Missing STRIPE_WEBHOOK_SECRET");
+      return res.status(500).send("Webhook not configured");
+    }
+    // console.log("WEBHOOK secret prefix:", process.env.STRIPE_WEBHOOK_SECRET?.slice(0, 8));
+    // console.log("SIG header present:", !!req.headers["stripe-signature"]);
+    // console.log("Body is Buffer:", Buffer.isBuffer(req.body));
+
+
+    // req.body is a Buffer because of express.raw in app.ts
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+    const event = stripe.webhooks.constructEvent(req.body as any, sig, secret);
+    console.log("STRIPE EVENT:", event.type);
+
+    await billingService.handleStripeWebhookEvent(event);
+
+    return res.json({ received: true });
+  } catch (err: any) {
+    console.error("stripeWebhookController error:", err?.message || err);
+    return res.status(400).send(`Webhook Error: ${err?.message || "Unknown error"}`);
+  }
+}
+

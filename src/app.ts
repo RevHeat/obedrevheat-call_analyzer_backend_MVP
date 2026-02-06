@@ -20,6 +20,7 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+app.use("/api/billing/webhook", express.raw({ type: "application/json" }));
 
 app.use(express.json());
 app.use(cookieParser());
@@ -28,7 +29,7 @@ app.use("/api", authRoutes);
 app.use("/api", analyzeRoutes);
 app.use("/api", feedbackRoutes);
 app.use("/api", billingRoutes);
-app.use("/api", analysisRunsRoutes); // ✅ <-- ADD
+app.use("/api", analysisRunsRoutes); 
 
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({ ok: true });

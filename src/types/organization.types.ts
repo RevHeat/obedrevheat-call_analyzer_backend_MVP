@@ -8,6 +8,7 @@ export type OrganizationAttributes = {
 
   // ===== Billing / Subscription =====
   plan_key?: string | null;
+  billing_interval?: "monthly" | "annual" | null;
   subscription_status?: string | null;
   trial_ends_at?: Date | null;
   current_period_end?: Date | null;
@@ -26,6 +27,7 @@ export type OrganizationCreationAttributes = Optional<
   | "id"
   | "created_by_user_id"
   | "plan_key"
+  | "billing_interval"
   | "subscription_status"
   | "trial_ends_at"
   | "current_period_end"
