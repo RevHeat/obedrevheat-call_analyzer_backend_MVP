@@ -4,7 +4,6 @@ const AWS_REGION = process.env.AWS_REGION || "us-east-1";
 const SES_FROM_EMAIL = process.env.SES_FROM_EMAIL;
 
 if (!SES_FROM_EMAIL) {
-  // Esto falla rápido si te falta la env
   console.warn("[EmailService] Missing SES_FROM_EMAIL env var");
 }
 
@@ -54,11 +53,66 @@ export class EmailService {
       },
     });
 
-        try {
-        await ses.send(command);
-        } catch (err: any) {
-        console.error("SES send error:", err?.name, err?.message);
-        throw err;
-        }
+    try {
+      await ses.send(command);
+    } catch (err: any) {
+      console.error("SES send error:", err?.name, err?.message);
+      throw err;
+    }
+  }
+
+  static async sendOrgInviteEmail(params: {
+    to: string;
+    inviteUrl: string;
+    orgName: string;
+  }) {
+    const { to, inviteUrl, orgName } = params;
+
+    if (!SES_FROM_EMAIL) {
+      throw new Error("SES_FROM_EMAIL is not configured");
+    }
+
+    const subject = `You're invited to join ${orgName} on RevHeat`;
+
+    const textBody = [
+      `You’ve been invited to join ${orgName} on RevHeat.`,
+      "",
+      "Accept your invite:",
+      inviteUrl,
+      "",
+      "If you weren’t expecting this invite, you can ignore this email.",
+    ].join("\n");
+
+    const htmlBody = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5;">
+        <p>You’ve been invited to join <strong>${orgName}</strong> on RevHeat.</p>
+        <p>
+          <a href="${inviteUrl}" style="display:inline-block;padding:10px 14px;border-radius:8px;text-decoration:none;">
+            Accept invite
+          </a>
+        </p>
+        <p style="word-break: break-all;">Or paste this link in your browser:<br/>${inviteUrl}</p>
+        <p>If you weren’t expecting this invite, you can ignore this email.</p>
+      </div>
+    `;
+
+    const command = new SendEmailCommand({
+      Source: SES_FROM_EMAIL,
+      Destination: { ToAddresses: [to] },
+      Message: {
+        Subject: { Data: subject, Charset: "UTF-8" },
+        Body: {
+          Text: { Data: textBody, Charset: "UTF-8" },
+          Html: { Data: htmlBody, Charset: "UTF-8" },
+        },
+      },
+    });
+
+    try {
+      await ses.send(command);
+    } catch (err: any) {
+      console.error("SES send error:", err?.name, err?.message);
+      throw err;
+    }
   }
 }

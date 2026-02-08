@@ -18,7 +18,7 @@ router.post("/billing/checkout", requireAuth, requireOrgContext, createCheckoutS
 
 router.post("/billing/portal", requireAuth, requireOrgContext, createBillingPortalSessionController);
 router.post("/billing/sync", requireAuth, requireOrgContext, syncBillingController);
-router.post("/billing/webhook", stripeWebhookController);
+// router.post("/billing/webhook", stripeWebhookController);
 
 
 

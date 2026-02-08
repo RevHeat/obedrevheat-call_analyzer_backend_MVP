@@ -8,13 +8,20 @@ export async function requireOrgContext(
   next: NextFunction
 ) {
   try {
-    const userId = (req as any)?.auth?.userId as string | undefined;
+    const userId =
+      ((req as any)?.user_id as string | undefined) ||
+      ((req as any)?.user?.id as string | undefined) ||
+      ((req as any)?.auth?.userId as string | undefined) ||
+      ((req as any)?.auth?.user?.id as string | undefined);
 
     if (!userId) {
-      return res.status(401).json({ ok: false, error: "Missing auth context" });
+      return res.status(401).json({
+        ok: false,
+        error: "MISSING_AUTH_CONTEXT",
+        message: "Missing auth context",
+      });
     }
 
-    // MVP assumption: user belongs to a single active org
     const membership = await OrganizationMember.findOne({
       where: { user_id: userId, status: "active" },
       order: [["created_at", "ASC"]],
@@ -30,15 +37,26 @@ export async function requireOrgContext(
 
     const orgId = (membership as any).org_id as string;
 
-    // Optional: validate org exists (nice safety)
     const org = await Organization.findByPk(orgId);
     if (!org) {
       return res.status(404).json({ ok: false, error: "ORG_NOT_FOUND" });
     }
 
-    // Attach to request for downstream usage
-    (req as any).auth = { ...(req as any).auth, orgId };
-    (req as any).org_id = orgId; 
+  
+    (req as any).user_id = userId;
+    (req as any).org_id = orgId;
+
+    (req as any).membership = {
+      org_id: (membership as any).org_id,
+      user_id: (membership as any).user_id,
+      role: (membership as any).role,
+      status: (membership as any).status,
+    };
+
+    (req as any).org_name = (org as any).name || undefined;
+
+
+    (req as any).auth = { ...(req as any).auth, userId, orgId };
 
     return next();
   } catch (err) {

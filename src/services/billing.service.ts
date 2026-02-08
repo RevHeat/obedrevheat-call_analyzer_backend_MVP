@@ -1,3 +1,5 @@
+// src/services/billing.service.ts
+
 import Organization from "../db/models/Organization";
 import Stripe from "stripe";
 import {
@@ -32,44 +34,44 @@ function daysLeft(trialEndsAt: Date | null) {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 //PROD
-// const PRICE_MAP = {
-//   solo: {
-//     monthly: "price_1SwOmfLBlOKCyaWYOGZKC28d",
-//     annual: "price_1SwOtELBlOKCyaWYpDMuxB2m",
-//   },
-//   team_5: {
-//     monthly: "price_1SwOo1LBlOKCyaWYPCYcokwO",
-//     annual: "price_1SwOs6LBlOKCyaWYXjJNsHsD",
-//   },
-//   team_10: {
-//     monthly: "price_1SwOqiLBlOKCyaWYfEHe6guV",
-//     annual: "price_1SwOqiLBlOKCyaWYicjsh32L",
-//   },
-// } as const;
-
-//dev
 const PRICE_MAP = {
   solo: {
-    monthly: "price_1SwOmgLBlOKCyaWYLPz8ECzj",
-    annual: "price_1SwOtFLBlOKCyaWY7WKjV7Xv",
+    monthly: "price_1SwOmfLBlOKCyaWYOGZKC28d",
+    annual: "price_1SwOtELBlOKCyaWYpDMuxB2m",
   },
   team_5: {
-    monthly: "price_1SwOo1LBlOKCyaWYi0PdlyZ7",
-    annual: "price_1SwOs6LBlOKCyaWYxzeDpuE4",
+    monthly: "price_1SwOo1LBlOKCyaWYPCYcokwO",
+    annual: "price_1SwOs6LBlOKCyaWYXjJNsHsD",
   },
   team_10: {
-    monthly: "price_1SwOqjLBlOKCyaWY0snBMg8V",
-    annual: "price_1SwOqkLBlOKCyaWY7PsNhQF2",
+    monthly: "price_1SwOqiLBlOKCyaWYfEHe6guV",
+    annual: "price_1SwOqiLBlOKCyaWYicjsh32L",
   },
 } as const;
 
-/* reverse map para webhooks (luego) */
+//dev
+// const PRICE_MAP = {
+//   solo: {
+//     monthly: "price_1SwOmgLBlOKCyaWYLPz8ECzj",
+//     annual: "price_1SwOtFLBlOKCyaWY7WKjV7Xv",
+//   },
+//   team_5: {
+//     monthly: "price_1SwOo1LBlOKCyaWYi0PdlyZ7",
+//     annual: "price_1SwOs6LBlOKCyaWYxzeDpuE4",
+//   },
+//   team_10: {
+//     monthly: "price_1SwOqjLBlOKCyaWY0snBMg8V",
+//     annual: "price_1SwOqkLBlOKCyaWY7PsNhQF2",
+//   },
+// } as const;
+
+/* reverse map para webhooks */
 const PRICE_TO_PLAN: Record<
   string,
   { plan_key: "solo" | "team_5" | "team_10"; interval: BillingInterval }
 > = Object.entries(PRICE_MAP).reduce((acc, [planKey, intervals]) => {
   (Object.keys(intervals) as BillingInterval[]).forEach((interval) => {
-    const priceId = intervals[interval];
+    const priceId = (intervals as any)[interval] as string;
     acc[priceId] = { plan_key: planKey as any, interval };
   });
   return acc;
@@ -86,6 +88,39 @@ function stripeStatusToInternal(status: Stripe.Subscription.Status) {
   if (status === "canceled" || status === "unpaid")
     return SUBSCRIPTION_STATUSES.CANCELED;
   return SUBSCRIPTION_STATUSES.EXPIRED;
+}
+
+async function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+
+async function retrieveSubscriptionWithRetry(
+  subId: string,
+  attempts = 3
+): Promise<Stripe.Subscription> {
+  let last: Stripe.Subscription | null = null;
+
+  for (let i = 1; i <= attempts; i++) {
+    const sub = await stripe.subscriptions.retrieve(subId);
+    last = sub;
+
+    const cpe = (sub as any).current_period_end as number | null | undefined;
+    console.log("[STRIPE] retrieve sub snapshot", {
+      subId,
+      attempt: i,
+      status: sub.status,
+      current_period_end: cpe ?? null,
+      billing_cycle_anchor: (sub as any).billing_cycle_anchor ?? null,
+    });
+
+    if (cpe) return sub;
+
+    // backoff pequeño: 250ms, 500ms, 1000ms
+    if (i < attempts) await sleep(250 * Math.pow(2, i - 1));
+  }
+
+  return last!;
 }
 
 export class BillingService {
@@ -143,7 +178,6 @@ export class BillingService {
     ];
     if (!priceId) throw new Error("PRICE_NOT_FOUND");
 
-    /* Create / reuse Stripe customer */
     let customerId = org.stripe_customer_id;
     if (!customerId) {
       const customer = await stripe.customers.create({
@@ -153,10 +187,9 @@ export class BillingService {
       customerId = customer.id;
       await org.update({ stripe_customer_id: customerId });
     }
+
     const successUrl = `${process.env.APP_URL}/app/billing/success?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${process.env.APP_URL}/app/billing?checkout=cancel`;
-
-    /* Charge immediately on checkout (no trial) */
 
     const subscriptionData: Stripe.Checkout.SessionCreateParams.SubscriptionData =
       {
@@ -167,24 +200,6 @@ export class BillingService {
           interval: String(interval),
         },
       };
-
-    // if (
-    //   org.subscription_status === SUBSCRIPTION_STATUSES.TRIALING &&
-    //   org.trial_ends_at
-    // ) {
-    //   subscriptionData.trial_end = Math.floor(
-    //     new Date(org.trial_ends_at).getTime() / 1000
-    //   );
-    // }
-
-    // console.log("====== STRIPE CHECKOUT DEBUG ======");
-    // console.log("Stripe key prefix:", process.env.STRIPE_SECRET_KEY?.slice(0, 8));
-    // console.log("APP_URL:", process.env.APP_URL);
-    // console.log("Plan:", planKey);
-    // console.log("Interval:", interval);
-    // console.log("Price ID:", priceId);
-    // console.log("Customer ID:", customerId);
-    // console.log("===================================");
 
     try {
       const session = await stripe.checkout.sessions.create({
@@ -250,19 +265,19 @@ export class BillingService {
 
     if (!customerId) throw new Error("MISSING_CUSTOMER_ID");
 
-    const subExpanded =
+    const subscriptionId =
       typeof session.subscription === "string"
-        ? await stripe.subscriptions.retrieve(session.subscription)
-        : session.subscription;
+        ? session.subscription
+        : session.subscription?.id;
 
-    if (!subExpanded) throw new Error("MISSING_SUBSCRIPTION");
+    if (!subscriptionId) throw new Error("MISSING_SUBSCRIPTION");
 
-    // deleted subscription (runtime check)
+    const subExpanded = await retrieveSubscriptionWithRetry(subscriptionId, 3);
+
     if ((subExpanded as any).deleted === true) {
       throw new Error("SUBSCRIPTION_DELETED");
     }
 
-    // local shape to avoid Stripe typings mismatch
     type StripeSubShape = Stripe.Subscription & {
       current_period_end?: number | null;
       trial_end?: number | null;
@@ -292,16 +307,35 @@ export class BillingService {
 
     const seatsLimit = PLAN_SEATS_LIMIT[mapped.plan_key] ?? 1;
 
-    await org.update({
+    // ✅ FIX CRÍTICO:
+    // NO sobrescribir current_period_end con null (porque ya viste que subscription.created lo setea bien)
+    const updatePayload: any = {
       stripe_customer_id: customerId,
       stripe_subscription_id: sub.id,
       plan_key: mapped.plan_key,
       subscription_status: internalStatus,
       trial_ends_at: trialEndsAt,
-      current_period_end: currentPeriodEnd,
       seats_limit: seatsLimit,
       billing_interval: mapped.interval,
-    });
+    };
+
+    if (currentPeriodEnd) {
+      updatePayload.current_period_end = currentPeriodEnd;
+    } else {
+      console.warn(
+        "[SYNC] current_period_end is null from Stripe retrieve; NOT overwriting DB",
+        {
+          sessionId,
+          orgId: org.id,
+          subId: sub.id,
+          plan_key: mapped.plan_key,
+          interval: mapped.interval,
+          status: sub.status,
+        }
+      );
+    }
+
+    await org.update(updatePayload);
 
     return {
       ok: true,
@@ -317,9 +351,43 @@ export class BillingService {
 
   async handleStripeWebhookEvent(event: Stripe.Event) {
     switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+
+        console.log("[WEBHOOK] checkout.session.completed received", {
+          sessionId: session.id,
+          mode: session.mode,
+          client_reference_id: session.client_reference_id,
+          customer: session.customer,
+          subscription: session.subscription,
+        });
+
+        if (session.mode !== "subscription") return;
+
+        try {
+          const result = await this.syncFromStripeCheckoutSession(session.id);
+
+          console.log("[WEBHOOK] checkout.session.completed synced billing", {
+            sessionId: session.id,
+            org_id: result.org_id,
+            plan_key: result.plan_key,
+            interval: result.interval,
+            subscription_status: result.subscription_status,
+            current_period_end: result.current_period_end?.toISOString?.() ?? null,
+            seats_limit: result.seats_limit,
+          });
+        } catch (e: any) {
+          console.warn("[WEBHOOK] checkout.session.completed sync FAILED", {
+            sessionId: session.id,
+            err: e?.message || e,
+          });
+        }
+
+        return;
+      }
+
       case "customer.subscription.created":
       case "customer.subscription.updated": {
-        // local shape to avoid Stripe typings mismatch (same pattern as syncFromStripeCheckoutSession)
         type StripeSubShape = Stripe.Subscription & {
           current_period_end?: number | null;
           trial_end?: number | null;
@@ -334,32 +402,48 @@ export class BillingService {
           typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
         if (!customerId) throw new Error("MISSING_CUSTOMER_ID");
 
-        // Find org by stripe_customer_id first (best)
         let org = await Organization.findOne({
           where: { stripe_customer_id: customerId },
         });
 
-        // Fallback: metadata org_id (if you ever rely on it)
-        const metaOrgId = (sub.metadata?.org_id || sub.metadata?.orgId) as
+        const metaOrgId = (sub.metadata?.org_id || (sub.metadata as any)?.orgId) as
           | string
           | undefined;
+
         if (!org && metaOrgId) {
           org = await Organization.findByPk(metaOrgId);
         }
+
         if (!org) {
-          // console.warn("Webhook: org not found for customer, ignoring:", customerId);
+          console.warn("[WEBHOOK] subscription.* ORG NOT FOUND", {
+            eventType: event.type,
+            customerId,
+            metaOrgId,
+            subId: sub.id,
+          });
           return;
         }
 
         const priceId = sub.items?.data?.[0]?.price?.id;
         if (!priceId) {
-          // console.warn("Webhook: subscription without price, ignoring");
+          console.warn("[WEBHOOK] subscription.* MISSING PRICE ID", {
+            eventType: event.type,
+            subId: sub.id,
+            customerId,
+            metadata: sub.metadata,
+          });
           return;
         }
 
         const mapped = PRICE_TO_PLAN[priceId];
         if (!mapped) {
-          // console.warn("Webhook: unknown price id, ignoring:", priceId);
+          console.warn("[WEBHOOK] subscription.* UNKNOWN PRICE ID", {
+            eventType: event.type,
+            subId: sub.id,
+            priceId,
+            knownPriceIds: Object.keys(PRICE_TO_PLAN),
+            metadata: sub.metadata,
+          });
           return;
         }
 
@@ -370,16 +454,21 @@ export class BillingService {
             ? new Date(sub.trial_end * 1000)
             : null;
 
-        // Prefer the event payload if present; otherwise fetch the subscription from Stripe
         let periodEndSeconds: number | null | undefined = sub.current_period_end;
 
         if (!periodEndSeconds) {
           try {
             const fresh = await stripe.subscriptions.retrieve(sub.id);
-            // Some webhook payloads are partial; retrieve is usually complete
             periodEndSeconds = (fresh as any).current_period_end ?? null;
-          } catch (e) {
-            // If Stripe retrieve fails, we avoid overwriting current_period_end with null
+            console.log("[WEBHOOK] subscription.* retrieved fresh sub for period end", {
+              subId: sub.id,
+              periodEndSeconds,
+            });
+          } catch (e: any) {
+            console.warn("[WEBHOOK] subscription.* retrieve FAILED", {
+              subId: sub.id,
+              err: e?.message || e,
+            });
             periodEndSeconds = null;
           }
         }
@@ -399,17 +488,32 @@ export class BillingService {
           seats_limit: seatsLimit,
         };
 
-        // Only set current_period_end if we actually have it (avoid overwriting with null)
         if (currentPeriodEnd) {
           updatePayload.current_period_end = currentPeriodEnd;
+        } else {
+          console.warn(
+            "[WEBHOOK] subscription.* missing current_period_end (will not overwrite)",
+            { subId: sub.id, status: sub.status, priceId, mapped }
+          );
         }
 
         await org.update(updatePayload);
 
+        console.log("[WEBHOOK] subscription.* org updated", {
+          orgId: org.id,
+          plan_key: mapped.plan_key,
+          billing_interval: mapped.interval,
+          subscription_status: internalStatus,
+          current_period_end: currentPeriodEnd?.toISOString?.() ?? null,
+          seats_limit: seatsLimit,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: sub.id,
+        });
+
         return;
       }
 
-          case "invoice.payment_succeeded":
+      case "invoice.payment_succeeded":
       case "invoice.paid": {
         const invoice = event.data.object as Stripe.Invoice & {
           subscription?: string | Stripe.Subscription | null;
@@ -421,13 +525,23 @@ export class BillingService {
             ? invoice.subscription
             : invoice.subscription?.id;
 
-        if (!subscriptionId) return;
+        if (!subscriptionId) {
+          console.warn("[WEBHOOK] invoice.* missing subscriptionId", {
+            eventType: event.type,
+            invoiceId: invoice.id,
+          });
+          return;
+        }
 
-        // Source of truth: retrieve subscription (authoritative current_period_end + metadata)
         let sub: Stripe.Subscription;
         try {
           sub = await stripe.subscriptions.retrieve(subscriptionId);
-        } catch {
+        } catch (e: any) {
+          console.warn("[WEBHOOK] invoice.* subscription retrieve FAILED", {
+            eventType: event.type,
+            subscriptionId,
+            err: e?.message || e,
+          });
           return;
         }
 
@@ -435,12 +549,22 @@ export class BillingService {
           | number
           | null
           | undefined;
-        if (!periodEndSeconds) return;
 
-        const currentPeriodEnd = new Date(periodEndSeconds * 1000);
+        console.log("[WEBHOOK] invoice.* subscription snapshot", {
+          eventType: event.type,
+          invoiceId: invoice.id,
+          subId: sub.id,
+          status: sub.status,
+          current_period_end: periodEndSeconds ?? null,
+          billing_cycle_anchor: (sub as any).billing_cycle_anchor ?? null,
+          hasItems: !!(sub as any)?.items?.data?.length,
+        });
+
+        const currentPeriodEnd =
+          periodEndSeconds ? new Date(periodEndSeconds * 1000) : null;
+
         const internalStatus = stripeStatusToInternal(sub.status);
 
-        // Find org in the most reliable way(s)
         let org =
           (await Organization.findOne({ where: { stripe_subscription_id: sub.id } })) ||
           (await Organization.findOne({
@@ -450,27 +574,53 @@ export class BillingService {
             },
           }));
 
-        // Fallback to subscription metadata (your checkout sets org_id in metadata)
         const metaOrgId = (sub.metadata?.org_id || (sub.metadata as any)?.orgId) as
           | string
           | undefined;
+
         if (!org && metaOrgId) {
           org = await Organization.findByPk(metaOrgId);
         }
 
-        if (!org) return;
+        if (!org) {
+          console.warn("[WEBHOOK] invoice.* ORG NOT FOUND", {
+            eventType: event.type,
+            subId: sub.id,
+            customerId:
+              typeof sub.customer === "string" ? sub.customer : sub.customer?.id,
+            metaOrgId,
+          });
+          return;
+        }
 
-        await org.update({
+        const updatePayload: any = {
           stripe_customer_id:
             typeof sub.customer === "string" ? sub.customer : sub.customer?.id,
           stripe_subscription_id: sub.id,
           subscription_status: internalStatus,
-          current_period_end: currentPeriodEnd,
+        };
+
+        if (currentPeriodEnd) {
+          updatePayload.current_period_end = currentPeriodEnd;
+        } else {
+          console.warn(
+            "[WEBHOOK] invoice.* no current_period_end in retrieve; skipping field",
+            { eventType: event.type, subId: sub.id, status: sub.status }
+          );
+        }
+
+        await org.update(updatePayload);
+
+        console.log("[WEBHOOK] invoice.* org updated (status; period end if present)", {
+          eventType: event.type,
+          orgId: org.id,
+          subId: sub.id,
+          subscription_status: internalStatus,
+          current_period_end: currentPeriodEnd?.toISOString?.() ?? "(unchanged)",
         });
 
         return;
       }
-
 
       case "customer.subscription.deleted": {
         const sub = event.data.object as Stripe.Subscription;
@@ -482,17 +632,29 @@ export class BillingService {
         const org = await Organization.findOne({
           where: { stripe_customer_id: customerId },
         });
-        if (!org) return; // ignore if we don't recognize it
+
+        if (!org) {
+          console.warn("[WEBHOOK] subscription.deleted org not found", {
+            customerId,
+            subId: sub.id,
+          });
+          return;
+        }
 
         await org.update({
           subscription_status: SUBSCRIPTION_STATUSES.CANCELED,
+        });
+
+        console.log("[WEBHOOK] subscription.deleted org updated", {
+          orgId: org.id,
+          subId: sub.id,
+          stripe_customer_id: customerId,
         });
 
         return;
       }
 
       default:
-        // ignore other events for now
         return;
     }
   }

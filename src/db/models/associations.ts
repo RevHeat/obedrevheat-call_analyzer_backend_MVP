@@ -1,6 +1,7 @@
 import { User } from "./User";
 import { Organization } from "./Organization";
 import { OrganizationMember } from "./OrganizationMember";
+import { OrganizationInvite } from "./OrganizationInvite";
 import { RefreshToken } from "./RefreshToken";
 import { Feedback } from "./Feedback";
 import { AnalysisRun } from "./AnalysisRun";
@@ -53,6 +54,36 @@ export const setupAssociations = () => {
     foreignKey: "user_id",
     otherKey: "org_id",
     as: "organizations",
+  });
+
+  /**
+   * Organization ↔ OrganizationInvite
+   */
+  Organization.hasMany(OrganizationInvite, {
+    foreignKey: "org_id",
+    as: "invites",
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  });
+
+  OrganizationInvite.belongsTo(Organization, {
+    foreignKey: "org_id",
+    as: "organization",
+  });
+
+  /**
+   * User ↔ OrganizationInvite (invited_by)
+   */
+  User.hasMany(OrganizationInvite, {
+    foreignKey: "invited_by_user_id",
+    as: "sent_invites",
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  });
+
+  OrganizationInvite.belongsTo(User, {
+    foreignKey: "invited_by_user_id",
+    as: "invited_by",
   });
 
   /**
@@ -116,18 +147,17 @@ export const setupAssociations = () => {
   });
 
   /**
- * User ↔ PasswordResetToken
- */
-User.hasMany(PasswordResetToken, {
-  foreignKey: "user_id",
-  as: "password_reset_tokens",
-  onDelete: "CASCADE",
-  onUpdate: "CASCADE",
-});
+   * User ↔ PasswordResetToken
+   */
+  User.hasMany(PasswordResetToken, {
+    foreignKey: "user_id",
+    as: "password_reset_tokens",
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  });
 
-PasswordResetToken.belongsTo(User, {
-  foreignKey: "user_id",
-  as: "user",
-});
-
+  PasswordResetToken.belongsTo(User, {
+    foreignKey: "user_id",
+    as: "user",
+  });
 };
