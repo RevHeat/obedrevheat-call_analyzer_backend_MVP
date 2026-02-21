@@ -36,8 +36,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 //PROD
 const PRICE_MAP = {
   solo: {
-    monthly: "price_1SwOmfLBlOKCyaWYOGZKC28d",
-    annual: "price_1SwOtELBlOKCyaWYpDMuxB2m",
+    monthly: "price_1T3KfDLBlOKCyaWYx70FhyfI",
+    annual: "price_1T3KY3LBlOKCyaWY3N2xDTKL",
   },
   team_5: {
     monthly: "price_1SwOo1LBlOKCyaWYPCYcokwO",
