@@ -89,6 +89,48 @@ export async function createBillingPortalSessionController(
   }
 }
 
+export async function cancelSubscriptionController(req: Request, res: Response) {
+  try {
+    const orgId = (req as any).org_id as string | undefined;
+    if (!orgId)
+      return res.status(400).json({ ok: false, error: "ORG_NOT_FOUND" });
+
+    const result = await billingService.cancelSubscription(orgId);
+    return res.json(result);
+  } catch (err: any) {
+    const msg = err?.message || "INTERNAL_SERVER_ERROR";
+    if (msg === "ORG_NOT_FOUND")
+      return res.status(404).json({ ok: false, error: msg });
+    if (msg === "NO_ACTIVE_SUBSCRIPTION")
+      return res.status(400).json({ ok: false, error: msg });
+
+    console.error("cancelSubscriptionController error:", err);
+    return res.status(500).json({ ok: false, error: "INTERNAL_SERVER_ERROR" });
+  }
+}
+
+export async function reactivateSubscriptionController(req: Request, res: Response) {
+  try {
+    const orgId = (req as any).org_id as string | undefined;
+    if (!orgId)
+      return res.status(400).json({ ok: false, error: "ORG_NOT_FOUND" });
+
+    const result = await billingService.reactivateSubscription(orgId);
+    return res.json(result);
+  } catch (err: any) {
+    const msg = err?.message || "INTERNAL_SERVER_ERROR";
+    if (msg === "ORG_NOT_FOUND")
+      return res.status(404).json({ ok: false, error: msg });
+    if (msg === "NO_ACTIVE_SUBSCRIPTION")
+      return res.status(400).json({ ok: false, error: msg });
+    if (msg === "SUBSCRIPTION_NOT_PENDING_CANCELLATION")
+      return res.status(400).json({ ok: false, error: msg });
+
+    console.error("reactivateSubscriptionController error:", err);
+    return res.status(500).json({ ok: false, error: "INTERNAL_SERVER_ERROR" });
+  }
+}
+
 export async function syncBillingController(req: Request, res: Response) {
   try {
     const { session_id } = req.body as { session_id?: string };

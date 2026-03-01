@@ -14,6 +14,9 @@ export type OrganizationAttributes = {
   current_period_end?: Date | null;
   seats_limit?: number | null;
 
+  cancel_at_period_end?: boolean | null;
+  past_due_since?: Date | null;
+
   // Stripe
   stripe_customer_id?: string | null;
   stripe_subscription_id?: string | null;
@@ -32,6 +35,8 @@ export type OrganizationCreationAttributes = Optional<
   | "trial_ends_at"
   | "current_period_end"
   | "seats_limit"
+  | "cancel_at_period_end"
+  | "past_due_since"
   | "stripe_customer_id"
   | "stripe_subscription_id"
   | "created_at"

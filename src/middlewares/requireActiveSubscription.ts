@@ -23,6 +23,7 @@ export const requireActiveSubscription = async (
     const allowed = isSubscriptionAllowed({
       subscription_status: org.subscription_status,
       trial_ends_at: org.trial_ends_at,
+      past_due_since: org.past_due_since,
     });
 
     if (!allowed) {

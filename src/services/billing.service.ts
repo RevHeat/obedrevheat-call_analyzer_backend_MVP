@@ -19,6 +19,8 @@ type BillingState = {
   trial_ends_at: Date | null;
   current_period_end: Date | null;
   seats_limit: number | null;
+  cancel_at_period_end: boolean;
+  past_due_since: Date | null;
   allowed: boolean;
   is_trial: boolean;
   trial_days_left: number;
@@ -34,36 +36,36 @@ function daysLeft(trialEndsAt: Date | null) {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 //PROD
-const PRICE_MAP = {
-  solo: {
-    monthly: "price_1T3KfDLBlOKCyaWYx70FhyfI",
-    annual: "price_1T3KY3LBlOKCyaWY3N2xDTKL",
-  },
-  team_5: {
-    monthly: "price_1SwOo1LBlOKCyaWYPCYcokwO",
-    annual: "price_1SwOs6LBlOKCyaWYXjJNsHsD",
-  },
-  team_10: {
-    monthly: "price_1SwOqiLBlOKCyaWYfEHe6guV",
-    annual: "price_1SwOqiLBlOKCyaWYicjsh32L",
-  },
-} as const;
-
-//dev
 // const PRICE_MAP = {
 //   solo: {
-//     monthly: "price_1SwOmgLBlOKCyaWYLPz8ECzj",
-//     annual: "price_1SwOtFLBlOKCyaWY7WKjV7Xv",
+//     monthly: "price_1T3KfDLBlOKCyaWYx70FhyfI",
+//     annual: "price_1T3KY3LBlOKCyaWY3N2xDTKL",
 //   },
 //   team_5: {
-//     monthly: "price_1SwOo1LBlOKCyaWYi0PdlyZ7",
-//     annual: "price_1SwOs6LBlOKCyaWYxzeDpuE4",
+//     monthly: "price_1SwOo1LBlOKCyaWYPCYcokwO",
+//     annual: "price_1SwOs6LBlOKCyaWYXjJNsHsD",
 //   },
 //   team_10: {
-//     monthly: "price_1SwOqjLBlOKCyaWY0snBMg8V",
-//     annual: "price_1SwOqkLBlOKCyaWY7PsNhQF2",
+//     monthly: "price_1SwOqiLBlOKCyaWYfEHe6guV",
+//     annual: "price_1SwOqiLBlOKCyaWYicjsh32L",
 //   },
 // } as const;
+
+// //dev
+const PRICE_MAP = {
+  solo: {
+    monthly: "price_1SwOmgLBlOKCyaWYLPz8ECzj",
+    annual: "price_1SwOtFLBlOKCyaWY7WKjV7Xv",
+  },
+  team_5: {
+    monthly: "price_1SwOo1LBlOKCyaWYi0PdlyZ7",
+    annual: "price_1SwOs6LBlOKCyaWYxzeDpuE4",
+  },
+  team_10: {
+    monthly: "price_1SwOqjLBlOKCyaWY0snBMg8V",
+    annual: "price_1SwOqkLBlOKCyaWY7PsNhQF2",
+  },
+} as const;
 
 /* reverse map para webhooks */
 const PRICE_TO_PLAN: Record<
@@ -130,9 +132,12 @@ export class BillingService {
 
     const trialEnds = org.trial_ends_at ? new Date(org.trial_ends_at) : null;
 
+    const pastDueSince = org.past_due_since ? new Date(org.past_due_since) : null;
+
     const allowed = isSubscriptionAllowed({
       subscription_status: org.subscription_status,
       trial_ends_at: org.trial_ends_at,
+      past_due_since: pastDueSince,
     });
 
     const isTrial = org.subscription_status === SUBSCRIPTION_STATUSES.TRIALING;
@@ -147,6 +152,8 @@ export class BillingService {
         ? new Date(org.current_period_end)
         : null,
       seats_limit: org.seats_limit ?? null,
+      cancel_at_period_end: !!org.cancel_at_period_end,
+      past_due_since: pastDueSince,
       allowed,
       is_trial: isTrial,
       trial_days_left: isTrial ? daysLeft(trialEnds) : 0,
@@ -240,6 +247,35 @@ export class BillingService {
     });
 
     return { url: session.url };
+  }
+
+  async cancelSubscription(orgId: string) {
+    const org = await Organization.findByPk(orgId);
+    if (!org) throw new Error("ORG_NOT_FOUND");
+    if (!org.stripe_subscription_id) throw new Error("NO_ACTIVE_SUBSCRIPTION");
+
+    await stripe.subscriptions.update(org.stripe_subscription_id, {
+      cancel_at_period_end: true,
+    });
+
+    await org.update({ cancel_at_period_end: true });
+    console.log(`[BILLING] Subscription canceled at period end for org ${orgId}`);
+    return { ok: true };
+  }
+
+  async reactivateSubscription(orgId: string) {
+    const org = await Organization.findByPk(orgId);
+    if (!org) throw new Error("ORG_NOT_FOUND");
+    if (!org.stripe_subscription_id) throw new Error("NO_ACTIVE_SUBSCRIPTION");
+    if (!org.cancel_at_period_end) throw new Error("SUBSCRIPTION_NOT_PENDING_CANCELLATION");
+
+    await stripe.subscriptions.update(org.stripe_subscription_id, {
+      cancel_at_period_end: false,
+    });
+
+    await org.update({ cancel_at_period_end: false });
+    console.log(`[BILLING] Subscription reactivated for org ${orgId}`);
+    return { ok: true };
   }
 
   async syncFromStripeCheckoutSession(sessionId: string) {
@@ -486,6 +522,7 @@ export class BillingService {
           subscription_status: internalStatus,
           trial_ends_at: trialEndsAt,
           seats_limit: seatsLimit,
+          cancel_at_period_end: !!(sub as any).cancel_at_period_end,
         };
 
         if (currentPeriodEnd) {
@@ -495,6 +532,13 @@ export class BillingService {
             "[WEBHOOK] subscription.* missing current_period_end (will not overwrite)",
             { subId: sub.id, status: sub.status, priceId, mapped }
           );
+        }
+
+        // Track past_due_since transitions
+        if (internalStatus === SUBSCRIPTION_STATUSES.PAST_DUE && !org.past_due_since) {
+          updatePayload.past_due_since = new Date();
+        } else if (internalStatus !== SUBSCRIPTION_STATUSES.PAST_DUE && org.past_due_since) {
+          updatePayload.past_due_since = null;
         }
 
         await org.update(updatePayload);
@@ -508,6 +552,8 @@ export class BillingService {
           seats_limit: seatsLimit,
           stripe_customer_id: customerId,
           stripe_subscription_id: sub.id,
+          cancel_at_period_end: updatePayload.cancel_at_period_end,
+          past_due_since: updatePayload.past_due_since ?? org.past_due_since,
         });
 
         return;
@@ -607,6 +653,11 @@ export class BillingService {
             "[WEBHOOK] invoice.* no current_period_end in retrieve; skipping field",
             { eventType: event.type, subId: sub.id, status: sub.status }
           );
+        }
+
+        // Clear past_due_since on successful payment
+        if (org.past_due_since) {
+          updatePayload.past_due_since = null;
         }
 
         await org.update(updatePayload);

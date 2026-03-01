@@ -30,12 +30,16 @@ export const PLAN_SEATS_LIMIT: Record<PlanKey, number | null> = {
   [PLAN_KEYS.ENTERPRISE]: null,
 };
 
+// 7-day grace period for past_due status
+export const PAST_DUE_GRACE_DAYS = 7;
+
 // Central rule: can this org use the product?
 export function isSubscriptionAllowed(args: {
   subscription_status: string | null | undefined;
   trial_ends_at: Date | string | null | undefined;
+  past_due_since?: Date | string | null | undefined;
 }) {
-  const { subscription_status, trial_ends_at } = args;
+  const { subscription_status, trial_ends_at, past_due_since } = args;
 
   if (subscription_status === SUBSCRIPTION_STATUSES.ACTIVE) return true;
 
@@ -43,6 +47,13 @@ export function isSubscriptionAllowed(args: {
     if (!trial_ends_at) return false;
     const end = trial_ends_at instanceof Date ? trial_ends_at : new Date(trial_ends_at);
     return end.getTime() > Date.now();
+  }
+
+  if (subscription_status === SUBSCRIPTION_STATUSES.PAST_DUE) {
+    if (!past_due_since) return true; // no recorded date → allow (freshly transitioned)
+    const since = past_due_since instanceof Date ? past_due_since : new Date(past_due_since);
+    const gracePeriodMs = PAST_DUE_GRACE_DAYS * 24 * 60 * 60 * 1000;
+    return Date.now() - since.getTime() < gracePeriodMs;
   }
 
   return false;

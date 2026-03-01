@@ -22,6 +22,9 @@ export class Organization
   declare current_period_end?: Date | null;
   declare seats_limit?: number | null;
 
+  declare cancel_at_period_end?: boolean | null;
+  declare past_due_since?: Date | null;
+
   // ===== Stripe =====
   declare stripe_customer_id?: string | null;
   declare stripe_subscription_id?: string | null;
@@ -85,6 +88,17 @@ Organization.init(
 
     seats_limit: {
       type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+
+    cancel_at_period_end: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+
+    past_due_since: {
+      type: DataTypes.DATE,
       allowNull: true,
     },
 

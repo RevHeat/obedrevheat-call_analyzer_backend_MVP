@@ -6,6 +6,8 @@ import {
   getBillingStatusController,
   createCheckoutSessionController,
   createBillingPortalSessionController,
+  cancelSubscriptionController,
+  reactivateSubscriptionController,
   syncBillingController,
   stripeWebhookController
 } from "../controllers/billing.controller";
@@ -17,6 +19,8 @@ router.get("/billing/status", requireAuth, requireOrgContext, getBillingStatusCo
 router.post("/billing/checkout", requireAuth, requireOrgContext, createCheckoutSessionController);
 
 router.post("/billing/portal", requireAuth, requireOrgContext, createBillingPortalSessionController);
+router.post("/billing/cancel", requireAuth, requireOrgContext, cancelSubscriptionController);
+router.post("/billing/reactivate", requireAuth, requireOrgContext, reactivateSubscriptionController);
 router.post("/billing/sync", requireAuth, requireOrgContext, syncBillingController);
 // router.post("/billing/webhook", stripeWebhookController);
 
