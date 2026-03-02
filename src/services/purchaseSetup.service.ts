@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { Op, Transaction } from "sequelize";
 import argon2 from "argon2";
+import Stripe from "stripe";
 
 import { sequelize } from "../db/sequelizeSetup";
 import { PurchaseSetupToken } from "../db/models/PurchaseSetupToken";
@@ -10,7 +11,10 @@ import { OrganizationMember } from "../db/models/OrganizationMember";
 import { EmailService } from "./email.service";
 import { PLAN_KEYS, SUBSCRIPTION_STATUSES } from "../constants/billing";
 
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
+
 const FRONTEND_URL = process.env.APP_URL || "http://localhost:3000";
+const LIFETIME_PRICE_ID = process.env.STRIPE_LIFETIME_PRICE_ID || "";
 const SETUP_TOKEN_EXPIRY_DAYS = 7;
 
 class HttpError extends Error {
@@ -61,6 +65,20 @@ export default class PurchaseSetupService {
    * Called from webhook when checkout.session.completed with mode=payment
    */
   static async handleOneTimePayment(session: any) {
+    // Verify this payment is for our lifetime product
+    if (LIFETIME_PRICE_ID) {
+      try {
+        const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1 });
+        const priceId = lineItems.data[0]?.price?.id;
+        if (priceId && priceId !== LIFETIME_PRICE_ID) {
+          console.log("[PurchaseSetup] Price ID mismatch, skipping", { priceId, expected: LIFETIME_PRICE_ID });
+          return;
+        }
+      } catch (err: any) {
+        console.warn("[PurchaseSetup] Could not verify price ID, proceeding anyway", err?.message);
+      }
+    }
+
     const email = (
       session.customer_details?.email ||
       session.customer_email ||
