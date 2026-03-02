@@ -8,6 +8,7 @@ import feedbackRoutes from "./routes/feedback.routes";
 import billingRoutes from "./routes/billing.routes";
 import analysisRunsRoutes from "./routes/analysisRuns.routes";
 import orgRoutes from "./routes/org.routes";
+import purchaseSetupRoutes from "./routes/purchaseSetup.routes";
 
 import { stripeWebhookController } from "./controllers/billing.controller"; // <-- agrega esto
 
@@ -39,6 +40,7 @@ app.use("/api", feedbackRoutes);
 app.use("/api", billingRoutes);
 app.use("/api", analysisRunsRoutes);
 app.use("/api", orgRoutes);
+app.use("/api", purchaseSetupRoutes);
 
 app.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({ ok: true });

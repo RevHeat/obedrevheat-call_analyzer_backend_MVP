@@ -16,6 +16,7 @@ export const SUBSCRIPTION_STATUSES = {
   PAST_DUE: "past_due",
   CANCELED: "canceled",
   EXPIRED: "expired",
+  LIFETIME: "lifetime",
 } as const;
 
 export type SubscriptionStatus =
@@ -40,6 +41,8 @@ export function isSubscriptionAllowed(args: {
   past_due_since?: Date | string | null | undefined;
 }) {
   const { subscription_status, trial_ends_at, past_due_since } = args;
+
+  if (subscription_status === SUBSCRIPTION_STATUSES.LIFETIME) return true;
 
   if (subscription_status === SUBSCRIPTION_STATUSES.ACTIVE) return true;
 

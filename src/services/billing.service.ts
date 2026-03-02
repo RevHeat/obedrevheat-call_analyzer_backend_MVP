@@ -23,6 +23,7 @@ type BillingState = {
   past_due_since: Date | null;
   allowed: boolean;
   is_trial: boolean;
+  is_lifetime: boolean;
   trial_days_left: number;
   billing_required: boolean;
 };
@@ -156,6 +157,7 @@ export class BillingService {
       past_due_since: pastDueSince,
       allowed,
       is_trial: isTrial,
+      is_lifetime: org.subscription_status === SUBSCRIPTION_STATUSES.LIFETIME,
       trial_days_left: isTrial ? daysLeft(trialEnds) : 0,
       billing_required: !allowed,
     };
@@ -397,6 +399,12 @@ export class BillingService {
           customer: session.customer,
           subscription: session.subscription,
         });
+
+        if (session.mode === "payment") {
+          const PurchaseSetupService = (await import("./purchaseSetup.service")).default;
+          await PurchaseSetupService.handleOneTimePayment(session);
+          return;
+        }
 
         if (session.mode !== "subscription") return;
 
