@@ -10,7 +10,7 @@ import { OrganizationMember } from "../db/models/OrganizationMember";
 import { EmailService } from "./email.service";
 import { PLAN_KEYS, SUBSCRIPTION_STATUSES } from "../constants/billing";
 
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
+const FRONTEND_URL = process.env.APP_URL || "http://localhost:3000";
 const SETUP_TOKEN_EXPIRY_DAYS = 7;
 
 class HttpError extends Error {
