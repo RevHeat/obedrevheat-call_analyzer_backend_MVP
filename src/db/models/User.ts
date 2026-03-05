@@ -17,6 +17,10 @@ export class User
   declare avatar_url: string | null;
   declare last_seen_at: Date | null;
 
+  // Whop
+  declare whop_user_id: string | null;
+  declare whop_username: string | null;
+
   declare readonly created_at: Date;
   declare readonly updated_at: Date;
 }
@@ -64,6 +68,17 @@ User.init(
 
     last_seen_at: {
       type: DataTypes.DATE,
+      allowNull: true,
+    },
+
+    // Whop
+    whop_user_id: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true,
+    },
+    whop_username: {
+      type: DataTypes.STRING,
       allowNull: true,
     },
   },

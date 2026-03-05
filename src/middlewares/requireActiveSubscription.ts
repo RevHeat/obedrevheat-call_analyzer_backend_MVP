@@ -24,6 +24,7 @@ export const requireActiveSubscription = async (
       subscription_status: org.subscription_status,
       trial_ends_at: org.trial_ends_at,
       past_due_since: org.past_due_since,
+      access_source: org.access_source,
     });
 
     if (!allowed) {

@@ -21,6 +21,10 @@ export type OrganizationAttributes = {
   stripe_customer_id?: string | null;
   stripe_subscription_id?: string | null;
 
+  // Whop
+  whop_membership_id?: string | null;
+  access_source?: string | null;
+
   created_at?: Date;
   updated_at?: Date;
 };
@@ -39,6 +43,8 @@ export type OrganizationCreationAttributes = Optional<
   | "past_due_since"
   | "stripe_customer_id"
   | "stripe_subscription_id"
+  | "whop_membership_id"
+  | "access_source"
   | "created_at"
   | "updated_at"
 >;

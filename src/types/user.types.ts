@@ -10,6 +10,10 @@ export type UserAttributes = {
   avatar_url: string | null;
   last_seen_at: Date | null;
 
+  // Whop
+  whop_user_id: string | null;
+  whop_username: string | null;
+
   created_at?: Date;
   updated_at?: Date;
 };
@@ -26,6 +30,9 @@ export type UserCreationAttributes = {
   avatar_url?: string | null;
   last_seen_at?: Date | null;
 
+  // Whop
+  whop_user_id?: string | null;
+  whop_username?: string | null;
 
   created_at?: Date;
   updated_at?: Date;

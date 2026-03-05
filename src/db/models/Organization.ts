@@ -28,6 +28,10 @@ export class Organization
   // ===== Stripe =====
   declare stripe_customer_id?: string | null;
   declare stripe_subscription_id?: string | null;
+
+  // ===== Whop =====
+  declare whop_membership_id?: string | null;
+  declare access_source?: string | null;
 }
 
 Organization.init(
@@ -111,6 +115,17 @@ Organization.init(
     stripe_subscription_id: {
       type: DataTypes.STRING,
       allowNull: true,
+    },
+
+    // ===== Whop =====
+    whop_membership_id: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    access_source: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      defaultValue: "stripe",
     },
   },
   {
