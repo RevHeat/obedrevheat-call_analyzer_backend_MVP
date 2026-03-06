@@ -61,14 +61,71 @@ export async function checkWhopAccess(
 }
 
 /**
- * Find or create a local user + org from a Whop user ID.
- * Auto-provisions on first visit from Whop iframe.
+ * Provision a user from a GHL purchase.
+ * Called by the /api/whop/provision endpoint when GHL sends a webhook after purchase.
+ * Creates user + org in the DB so that when they later enter via Whop, they get linked.
+ */
+export async function provisionGhlPurchase(email: string, fullName?: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // Already exists? (e.g. direct signup or duplicate webhook)
+  const existing = await User.findOne({ where: { email: normalizedEmail } });
+  if (existing) {
+    return { userId: existing.id, created: false };
+  }
+
+  const placeholderHash = crypto.randomBytes(64).toString("hex");
+
+  return await sequelize.transaction(async (t) => {
+    const user = await User.create(
+      {
+        email: normalizedEmail,
+        password_hash: placeholderHash,
+        email_verified: false,
+        full_name: fullName || normalizedEmail.split("@")[0],
+      },
+      { transaction: t }
+    );
+
+    const slug = `ghl-${normalizedEmail.split("@")[0]}`.slice(0, 50);
+
+    const org = await Organization.create(
+      {
+        name: fullName || normalizedEmail.split("@")[0],
+        slug,
+        created_by_user_id: user.id,
+        plan_key: PLAN_KEYS.SOLO,
+        subscription_status: SUBSCRIPTION_STATUSES.LIFETIME,
+        seats_limit: PLAN_SEATS_LIMIT[PLAN_KEYS.SOLO],
+        access_source: "whop",
+      },
+      { transaction: t }
+    );
+
+    await OrganizationMember.create(
+      {
+        org_id: org.id,
+        user_id: user.id,
+        role: "admin",
+        status: "active",
+        joined_at: new Date(),
+      },
+      { transaction: t }
+    );
+
+    return { userId: user.id, orgId: org.id, created: true };
+  });
+}
+
+/**
+ * Find an existing user from a Whop user ID.
+ * Does NOT auto-provision — user must already exist in DB (from GHL purchase or direct signup).
  *
  * Flow:
  * 1. Look up by whop_user_id → found → return
- * 2. Fetch profile from Whop API (username, name)
- * 3. Check if user with matching email exists → link whop_user_id
- * 4. Otherwise create new user + org + membership
+ * 2. Fetch profile from Whop API to get email
+ * 3. Look up by email → found → link whop_user_id → return
+ * 4. Not found → return null (user hasn't purchased through GHL)
  */
 export async function findOrCreateWhopUser(whopUserId: string) {
   // 1. Already linked?
@@ -91,19 +148,19 @@ export async function findOrCreateWhopUser(whopUserId: string) {
 
   // 2. Fetch profile from Whop
   const whopUser = await getWhopUserInfo(whopUserId);
-
-  // 3. Check if a user with matching email already exists (e.g. from Stripe/direct signup)
-  //    Whop may expose email via API, or user may share email through Zapier flow
   const whopEmail = (whopUser as any).email as string | undefined;
+
+  // 3. Try to find by email (user provisioned by GHL or direct signup)
   if (whopEmail) {
-    const byEmail = await User.findOne({ where: { email: whopEmail } });
+    const byEmail = await User.findOne({
+      where: { email: whopEmail.trim().toLowerCase() },
+    });
     if (byEmail) {
       // Link Whop identity to existing user
       byEmail.whop_user_id = whopUserId;
       byEmail.whop_username = whopUser.username;
       await byEmail.save();
 
-      // Upgrade org access_source to "both" if it was "stripe"
       const membership = await OrganizationMember.findOne({
         where: { user_id: byEmail.id, status: "active" },
         order: [["created_at", "ASC"]],
@@ -124,52 +181,6 @@ export async function findOrCreateWhopUser(whopUserId: string) {
     }
   }
 
-  // 4. Create new user + org in transaction
-  const placeholderHash = crypto.randomBytes(64).toString("hex");
-
-  return await sequelize.transaction(async (t) => {
-    const user = await User.create(
-      {
-        email: whopEmail || `${whopUserId}@whop.user`,
-        password_hash: placeholderHash,
-        email_verified: false,
-        full_name: whopUser.name || whopUser.username,
-        whop_user_id: whopUserId,
-        whop_username: whopUser.username,
-      },
-      { transaction: t }
-    );
-
-    const slug = `whop-${whopUser.username || whopUserId}`.slice(0, 50);
-
-    const org = await Organization.create(
-      {
-        name: whopUser.username || `Whop User`,
-        slug,
-        created_by_user_id: user.id,
-        plan_key: PLAN_KEYS.SOLO,
-        subscription_status: SUBSCRIPTION_STATUSES.ACTIVE,
-        seats_limit: PLAN_SEATS_LIMIT[PLAN_KEYS.SOLO],
-        access_source: "whop",
-      },
-      { transaction: t }
-    );
-
-    await OrganizationMember.create(
-      {
-        org_id: org.id,
-        user_id: user.id,
-        role: "admin",
-        status: "active",
-        joined_at: new Date(),
-      },
-      { transaction: t }
-    );
-
-    return {
-      userId: user.id,
-      orgId: org.id,
-      created: true,
-    };
-  });
+  // 4. User not found — hasn't purchased through GHL
+  return null;
 }

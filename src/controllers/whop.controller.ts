@@ -1,11 +1,34 @@
 import { Request, Response } from "express";
-import { whopClient } from "../services/whop.service";
+import { whopClient, provisionGhlPurchase } from "../services/whop.service";
 import {
   handleMembershipActivated,
   handleMembershipDeactivated,
   handlePaymentSucceeded,
   handlePaymentFailed,
 } from "../services/whopWebhook.service";
+
+const GHL_WEBHOOK_SECRET = process.env.GHL_WEBHOOK_SECRET || "";
+
+export async function ghlProvisionController(req: Request, res: Response) {
+  try {
+    // Verify the shared secret from GHL
+    const secret = req.headers["x-ghl-secret"] as string || "";
+    if (!GHL_WEBHOOK_SECRET || secret !== GHL_WEBHOOK_SECRET) {
+      return res.status(401).json({ ok: false, error: "Invalid webhook secret" });
+    }
+
+    const { email, name } = req.body;
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({ ok: false, error: "email is required" });
+    }
+
+    const result = await provisionGhlPurchase(email, name);
+    return res.status(200).json({ ok: true, created: result.created });
+  } catch (err: any) {
+    console.error("ghlProvisionController error:", err?.message || err);
+    return res.status(500).json({ ok: false, error: "Provisioning failed" });
+  }
+}
 
 export async function whopWebhookController(req: Request, res: Response) {
   try {

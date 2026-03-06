@@ -1,8 +1,9 @@
 import { Router } from "express";
+import { ghlProvisionController } from "../controllers/whop.controller";
 
 const router = Router();
 
-// Webhook route is mounted directly in app.ts (before JSON parser)
-// This file exists for any future Whop-specific authenticated routes
+// GHL webhook: provision a user after purchase
+router.post("/whop/provision", ghlProvisionController);
 
 export default router;

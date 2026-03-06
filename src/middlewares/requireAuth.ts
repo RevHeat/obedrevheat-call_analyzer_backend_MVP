@@ -29,10 +29,18 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     try {
       const { userId: whopUserId } = await verifyWhopUserToken(whopToken);
 
-      // Find or auto-provision user from Whop
-      const { userId, orgId } = await findOrCreateWhopUser(whopUserId);
+      // Find user from Whop — does NOT auto-provision
+      const result = await findOrCreateWhopUser(whopUserId);
 
-      (req as any).auth = { userId, orgId, source: "whop" };
+      if (!result) {
+        return res.status(403).json({
+          ok: false,
+          error: "no_purchase",
+          message: "No purchase found. Please buy through our sales page first.",
+        });
+      }
+
+      (req as any).auth = { userId: result.userId, orgId: result.orgId, source: "whop" };
       return next();
     } catch (err) {
       console.error("Whop token verification failed:", (err as Error).message);
