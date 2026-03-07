@@ -186,3 +186,34 @@ export async function findOrCreateWhopUser(whopUserId: string) {
   // 4. User not found — hasn't purchased through GHL
   return null;
 }
+
+/**
+ * Link a Whop user to an existing account by email.
+ * Called when the user enters their purchase email in the Whop iframe.
+ */
+export async function linkWhopUserByEmail(whopUserId: string, email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const user = await User.findOne({ where: { email: normalizedEmail } });
+  if (!user) return null;
+
+  // Already linked to a different Whop user?
+  if (user.whop_user_id && user.whop_user_id !== whopUserId) {
+    return null;
+  }
+
+  const whopUser = await getWhopUserInfo(whopUserId);
+  user.whop_user_id = whopUserId;
+  user.whop_username = whopUser.username;
+  await user.save();
+
+  const membership = await OrganizationMember.findOne({
+    where: { user_id: user.id, status: "active" },
+    order: [["created_at", "ASC"]],
+  });
+
+  return {
+    userId: user.id,
+    orgId: membership ? (membership as any).org_id : null,
+  };
+}

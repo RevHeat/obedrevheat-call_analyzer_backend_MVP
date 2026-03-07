@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { whopClient, provisionGhlPurchase } from "../services/whop.service";
+import { whopClient, provisionGhlPurchase, verifyWhopUserToken, linkWhopUserByEmail } from "../services/whop.service";
 import {
   handleMembershipActivated,
   handleMembershipDeactivated,
@@ -27,6 +27,36 @@ export async function ghlProvisionController(req: Request, res: Response) {
   } catch (err: any) {
     console.error("ghlProvisionController error:", err?.message || err);
     return res.status(500).json({ ok: false, error: "Provisioning failed" });
+  }
+}
+
+export async function whopLinkEmailController(req: Request, res: Response) {
+  try {
+    const whopToken = req.headers["x-whop-user-token"] as string || "";
+    if (!whopToken) {
+      return res.status(401).json({ ok: false, error: "Missing Whop token" });
+    }
+
+    const { userId: whopUserId } = await verifyWhopUserToken(whopToken);
+
+    const { email } = req.body;
+    if (!email || typeof email !== "string") {
+      return res.status(400).json({ ok: false, error: "email is required" });
+    }
+
+    const result = await linkWhopUserByEmail(whopUserId, email);
+    if (!result) {
+      return res.status(404).json({
+        ok: false,
+        error: "no_match",
+        message: "No account found with that email. Make sure you use the same email you purchased with.",
+      });
+    }
+
+    return res.status(200).json({ ok: true, userId: result.userId });
+  } catch (err: any) {
+    console.error("whopLinkEmailController error:", err?.message || err);
+    return res.status(500).json({ ok: false, error: "Linking failed" });
   }
 }
 
