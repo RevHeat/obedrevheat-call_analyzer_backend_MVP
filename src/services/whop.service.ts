@@ -35,10 +35,12 @@ export async function verifyWhopUserToken(token: string) {
  */
 export async function getWhopUserInfo(whopUserId: string) {
   const user = await whopClient.users.retrieve(whopUserId);
+  console.log("[whop] user profile:", JSON.stringify(user));
   return {
     id: user.id,
     username: user.username,
     name: user.name,
+    email: (user as any).email,
   };
 }
 
@@ -148,7 +150,7 @@ export async function findOrCreateWhopUser(whopUserId: string) {
 
   // 2. Fetch profile from Whop
   const whopUser = await getWhopUserInfo(whopUserId);
-  const whopEmail = (whopUser as any).email as string | undefined;
+  const whopEmail = whopUser.email as string | undefined;
 
   // 3. Try to find by email (user provisioned by GHL or direct signup)
   if (whopEmail) {
