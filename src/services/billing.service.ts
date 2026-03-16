@@ -37,36 +37,36 @@ function daysLeft(trialEndsAt: Date | null) {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 //PROD
-// const PRICE_MAP = {
-//   solo: {
-//     monthly: "price_1T3KfDLBlOKCyaWYx70FhyfI",
-//     annual: "price_1T3KY3LBlOKCyaWY3N2xDTKL",
-//   },
-//   team_5: {
-//     monthly: "price_1SwOo1LBlOKCyaWYPCYcokwO",
-//     annual: "price_1SwOs6LBlOKCyaWYXjJNsHsD",
-//   },
-//   team_10: {
-//     monthly: "price_1SwOqiLBlOKCyaWYfEHe6guV",
-//     annual: "price_1SwOqiLBlOKCyaWYicjsh32L",
-//   },
-// } as const;
-
-// //dev
 const PRICE_MAP = {
   solo: {
-    monthly: "price_1SwOmgLBlOKCyaWYLPz8ECzj",
-    annual: "price_1SwOtFLBlOKCyaWY7WKjV7Xv",
+    monthly: "price_1T3KfDLBlOKCyaWYx70FhyfI",
+    annual: "price_1T3KY3LBlOKCyaWY3N2xDTKL",
   },
   team_5: {
-    monthly: "price_1SwOo1LBlOKCyaWYi0PdlyZ7",
-    annual: "price_1SwOs6LBlOKCyaWYxzeDpuE4",
+    monthly: "price_1SwOo1LBlOKCyaWYPCYcokwO",
+    annual: "price_1SwOs6LBlOKCyaWYXjJNsHsD",
   },
   team_10: {
-    monthly: "price_1SwOqjLBlOKCyaWY0snBMg8V",
-    annual: "price_1SwOqkLBlOKCyaWY7PsNhQF2",
+    monthly: "price_1SwOqiLBlOKCyaWYfEHe6guV",
+    annual: "price_1SwOqiLBlOKCyaWYicjsh32L",
   },
 } as const;
+
+// //dev
+// const PRICE_MAP = {
+//   solo: {
+//     monthly: "price_1SwOmgLBlOKCyaWYLPz8ECzj",
+//     annual: "price_1SwOtFLBlOKCyaWY7WKjV7Xv",
+//   },
+//   team_5: {
+//     monthly: "price_1SwOo1LBlOKCyaWYi0PdlyZ7",
+//     annual: "price_1SwOs6LBlOKCyaWYxzeDpuE4",
+//   },
+//   team_10: {
+//     monthly: "price_1SwOqjLBlOKCyaWY0snBMg8V",
+//     annual: "price_1SwOqkLBlOKCyaWY7PsNhQF2",
+//   },
+// } as const;
 
 /* reverse map para webhooks */
 const PRICE_TO_PLAN: Record<
