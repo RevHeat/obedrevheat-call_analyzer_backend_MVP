@@ -163,6 +163,47 @@ export class BillingService {
     };
   }
 
+  async createPublicCheckoutSession(planKey: string, intervalRaw?: any) {
+    const interval = normalizeInterval(intervalRaw);
+
+    const allowedTargets = [PLAN_KEYS.SOLO, PLAN_KEYS.TEAM_5, PLAN_KEYS.TEAM_10];
+    if (!allowedTargets.includes(planKey as any))
+      throw new Error("INVALID_PLAN_KEY");
+
+    const priceId = PRICE_MAP[planKey as "solo" | "team_5" | "team_10"]?.[interval];
+    if (!priceId) throw new Error("PRICE_NOT_FOUND");
+
+    const successUrl = `${process.env.APP_URL}/purchase-success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${process.env.APP_URL}/pricing?checkout=cancel`;
+
+    try {
+      const session = await stripe.checkout.sessions.create({
+        mode: "subscription",
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        allow_promotion_codes: true,
+        metadata: {
+          flow: "public_checkout",
+          plan_key: String(planKey),
+          interval: String(interval),
+        },
+        subscription_data: {
+          metadata: {
+            flow: "public_checkout",
+            plan_key: String(planKey),
+            interval: String(interval),
+          },
+        },
+      });
+
+      return { url: session.url };
+    } catch (e: any) {
+      console.error("[PUBLIC_CHECKOUT] Stripe error:", e?.message);
+      throw e;
+    }
+  }
+
   async createCheckoutSession(
     orgId: string,
     userId: string,
@@ -407,6 +448,13 @@ export class BillingService {
         }
 
         if (session.mode !== "subscription") return;
+
+        // Public checkout flow (no pre-existing org)
+        if (session.metadata?.flow === "public_checkout") {
+          const PurchaseSetupService = (await import("./purchaseSetup.service")).default;
+          await PurchaseSetupService.handlePublicSubscription(session);
+          return;
+        }
 
         try {
           const result = await this.syncFromStripeCheckoutSession(session.id);

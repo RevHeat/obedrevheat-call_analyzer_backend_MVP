@@ -23,6 +23,35 @@ export async function getBillingStatusController(req: Request, res: Response) {
   }
 }
 
+export async function createPublicCheckoutController(
+  req: Request,
+  res: Response
+) {
+  try {
+    const { plan_key, interval } = req.body as {
+      plan_key?: string;
+      interval?: "monthly" | "annual";
+    };
+
+    if (!plan_key)
+      return res.status(400).json({ ok: false, error: "MISSING_PLAN_KEY" });
+
+    const { url } = await billingService.createPublicCheckoutSession(
+      plan_key,
+      interval
+    );
+
+    return res.json({ ok: true, url });
+  } catch (err: any) {
+    const msg = err?.message || "INTERNAL_SERVER_ERROR";
+    if (msg === "INVALID_PLAN_KEY")
+      return res.status(400).json({ ok: false, error: msg });
+
+    console.error("createPublicCheckoutController error:", err);
+    return res.status(500).json({ ok: false, error: "INTERNAL_SERVER_ERROR" });
+  }
+}
+
 export async function createCheckoutSessionController(
   req: Request,
   res: Response

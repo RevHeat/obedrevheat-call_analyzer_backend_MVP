@@ -4,6 +4,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { requireOrgContext } from "../middlewares/requireOrgContext";
 import {
   getBillingStatusController,
+  createPublicCheckoutController,
   createCheckoutSessionController,
   createBillingPortalSessionController,
   cancelSubscriptionController,
@@ -13,6 +14,9 @@ import {
 } from "../controllers/billing.controller";
 
 const router = Router();
+
+// Public (no auth) — used by /pricing page
+router.post("/billing/public-checkout", createPublicCheckoutController);
 
 router.get("/billing/status", requireAuth, requireOrgContext, getBillingStatusController);
 

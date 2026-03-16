@@ -9,7 +9,7 @@ import { User } from "../db/models/User";
 import { Organization } from "../db/models/Organization";
 import { OrganizationMember } from "../db/models/OrganizationMember";
 import { EmailService } from "./email.service";
-import { PLAN_KEYS, SUBSCRIPTION_STATUSES } from "../constants/billing";
+import { PLAN_KEYS, SUBSCRIPTION_STATUSES, PLAN_SEATS_LIMIT } from "../constants/billing";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
@@ -166,6 +166,106 @@ export default class PurchaseSetupService {
   }
 
   /**
+   * Called from webhook when checkout.session.completed with metadata.flow === "public_checkout"
+   */
+  static async handlePublicSubscription(session: any) {
+    const email = (
+      session.customer_details?.email ||
+      session.customer_email ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+    if (!email) {
+      console.warn("[PurchaseSetup] No email found in public subscription session", session.id);
+      return;
+    }
+
+    const sessionId = session.id;
+    const planKey = session.metadata?.plan_key || PLAN_KEYS.SOLO;
+    const interval = session.metadata?.interval || "monthly";
+
+    const stripeCustomerId =
+      typeof session.customer === "string"
+        ? session.customer
+        : session.customer?.id || null;
+
+    const stripeSubscriptionId =
+      typeof session.subscription === "string"
+        ? session.subscription
+        : session.subscription?.id || null;
+
+    // Idempotency: skip if already processed
+    const existing = await PurchaseSetupToken.findOne({
+      where: { stripe_checkout_session_id: sessionId },
+    });
+    if (existing) {
+      console.log("[PurchaseSetup] Public subscription session already processed, skipping", sessionId);
+      return;
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      await PurchaseSetupService.upgradeExistingUserSubscription(
+        existingUser,
+        stripeCustomerId,
+        stripeSubscriptionId,
+        planKey,
+        interval
+      );
+      // Record token for audit (marked as used immediately)
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      await PurchaseSetupToken.create({
+        email,
+        plan_key: planKey,
+        stripe_checkout_session_id: sessionId,
+        stripe_customer_id: stripeCustomerId,
+        stripe_subscription_id: stripeSubscriptionId,
+        billing_interval: interval,
+        token_hash: sha256(rawToken),
+        expires_at: new Date(Date.now() + SETUP_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
+        used_at: new Date(),
+      });
+      return;
+    }
+
+    // Revoke previous unused tokens for same email
+    await PurchaseSetupToken.update(
+      { used_at: new Date() },
+      { where: { email, used_at: null } }
+    );
+
+    // Generate new token
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = sha256(rawToken);
+    const expiresAt = new Date(Date.now() + SETUP_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+
+    await PurchaseSetupToken.create({
+      email,
+      plan_key: planKey,
+      stripe_checkout_session_id: sessionId,
+      stripe_customer_id: stripeCustomerId,
+      stripe_subscription_id: stripeSubscriptionId,
+      billing_interval: interval,
+      token_hash: tokenHash,
+      expires_at: expiresAt,
+    });
+
+    // Send welcome email
+    const setupUrl = `${FRONTEND_URL}/setup-account?token=${rawToken}`;
+    await EmailService.sendWelcomeSetupEmail({ to: email, setupUrl });
+
+    console.log("[PurchaseSetup] Public subscription token created and email sent", {
+      email,
+      sessionId,
+      planKey,
+      interval,
+    });
+  }
+
+  /**
    * Validate a setup token (for GET endpoint)
    */
   static async validateToken(rawToken: string) {
@@ -258,18 +358,25 @@ export default class PurchaseSetupService {
       const orgName = `${fullName}'s Workspace`;
       const slug = await ensureUniqueOrgSlug(slugify(orgName), txn);
 
+      // Determine org fields based on whether this is a subscription or lifetime token
+      const isSubscription = !!record.stripe_subscription_id;
+      const seatsLimit = PLAN_SEATS_LIMIT[record.plan_key as keyof typeof PLAN_SEATS_LIMIT] ?? 1;
+
       const org = await Organization.create(
         {
           name: orgName,
           slug,
           created_by_user_id: user.id,
           plan_key: record.plan_key,
-          subscription_status: SUBSCRIPTION_STATUSES.LIFETIME,
-          billing_interval: null,
+          subscription_status: isSubscription
+            ? SUBSCRIPTION_STATUSES.ACTIVE
+            : SUBSCRIPTION_STATUSES.LIFETIME,
+          billing_interval: isSubscription ? (record.billing_interval as "monthly" | "annual") : null,
           trial_ends_at: null,
           current_period_end: null,
-          seats_limit: 1,
+          seats_limit: seatsLimit,
           stripe_customer_id: record.stripe_customer_id,
+          stripe_subscription_id: record.stripe_subscription_id || undefined,
         },
         { transaction: txn }
       );
@@ -293,6 +400,63 @@ export default class PurchaseSetupService {
         email: user.email,
         user: { id: user.id, email: user.email },
       };
+    });
+  }
+
+  /**
+   * Upgrade an existing user's org with a subscription (called from public checkout webhook)
+   */
+  private static async upgradeExistingUserSubscription(
+    user: User,
+    stripeCustomerId: string | null,
+    stripeSubscriptionId: string | null,
+    planKey: string,
+    interval: string
+  ) {
+    return sequelize.transaction(async (txn) => {
+      const membership = await OrganizationMember.findOne({
+        where: { user_id: user.id, role: "admin" },
+        transaction: txn,
+      });
+
+      if (!membership) {
+        console.warn("[PurchaseSetup] No admin org found for user", user.email);
+        return;
+      }
+
+      const org = await Organization.findByPk(membership.org_id, {
+        transaction: txn,
+        lock: txn.LOCK.UPDATE,
+      });
+
+      if (!org) return;
+
+      const seatsLimit = PLAN_SEATS_LIMIT[planKey as keyof typeof PLAN_SEATS_LIMIT] ?? 1;
+
+      await org.update(
+        {
+          plan_key: planKey,
+          subscription_status: SUBSCRIPTION_STATUSES.ACTIVE,
+          billing_interval: interval as "monthly" | "annual",
+          trial_ends_at: null,
+          seats_limit: seatsLimit,
+          cancel_at_period_end: false,
+          past_due_since: null,
+          stripe_customer_id: stripeCustomerId || org.stripe_customer_id,
+          stripe_subscription_id: stripeSubscriptionId || org.stripe_subscription_id,
+        },
+        { transaction: txn }
+      );
+
+      const loginUrl = `${FRONTEND_URL}/login`;
+      await EmailService.sendPurchaseConfirmationEmail({ to: user.email, loginUrl });
+
+      console.log("[PurchaseSetup] Upgraded existing user subscription", {
+        email: user.email,
+        org_id: org.id,
+        planKey,
+        interval,
+      });
     });
   }
 

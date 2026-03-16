@@ -8,6 +8,8 @@ export class PurchaseSetupToken extends Model {
   declare stripe_checkout_session_id: string;
   declare stripe_customer_id: string | null;
   declare stripe_payment_intent_id: string | null;
+  declare stripe_subscription_id: string | null;
+  declare billing_interval: string | null;
   declare token_hash: string;
   declare expires_at: Date;
   declare used_at: Date | null;
@@ -41,6 +43,14 @@ PurchaseSetupToken.init(
       allowNull: true,
     },
     stripe_payment_intent_id: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    stripe_subscription_id: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    billing_interval: {
       type: DataTypes.STRING,
       allowNull: true,
     },
