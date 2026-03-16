@@ -43,7 +43,7 @@ const PRICE_MAP = {
     annual: "price_1T3KY3LBlOKCyaWY3N2xDTKL",
   },
   team_5: {
-    monthly: "price_1SwOo1LBlOKCyaWYPCYcokwO",
+    monthly: "price_1SwOo1LBlOKCyaWYjafqHARz",
     annual: "price_1SwOs6LBlOKCyaWYXjJNsHsD",
   },
   team_10: {
