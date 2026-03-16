@@ -145,6 +145,11 @@ export class AuthService {
     const user = await User.findOne({ where: { email } });
     if (!user) throw new Error("Invalid credentials");
 
+    // Accounts provisioned via Whop/GHL have a placeholder hash (not a valid Argon2 string)
+    if (!user.password_hash.startsWith("$")) {
+      throw new Error("This account was created through Whop. Please access the app from your Whop dashboard, or use 'Forgot Password' to set a password.");
+    }
+
     const ok = await argon2.verify(user.password_hash, password);
     if (!ok) throw new Error("Invalid credentials");
 
