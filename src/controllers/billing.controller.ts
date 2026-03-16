@@ -47,8 +47,8 @@ export async function createPublicCheckoutController(
     if (msg === "INVALID_PLAN_KEY")
       return res.status(400).json({ ok: false, error: msg });
 
-    console.error("createPublicCheckoutController error:", err);
-    return res.status(500).json({ ok: false, error: "INTERNAL_SERVER_ERROR" });
+    console.error("createPublicCheckoutController error:", err?.message, err);
+    return res.status(500).json({ ok: false, error: msg });
   }
 }
 
