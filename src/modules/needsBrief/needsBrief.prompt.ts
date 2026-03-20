@@ -67,6 +67,14 @@ If any of these happen, they must drive Priority #1:
 - Strategic Importance < 9/20
 - Premature Prescription
 
+=== PRIOR CONTEXT USAGE ===
+If prior context is provided (CRM notes, deal details, previous call info, competitors, etc.):
+- Calibrate scoring: do not penalize for areas already covered or resolved in previous calls.
+- Flag contradictions: if prior context claims something (e.g. "champion is VP Sales") but transcript evidence contradicts or shows no sign of it, call it out explicitly.
+- Tailor coaching: use competitive, stakeholder, or deal-specific details to make recommendations concrete rather than generic.
+- Cross-call awareness: if prior context describes progress from earlier calls, evaluate whether the rep built on that progress or lost ground.
+- If prior context is empty or null, ignore this section entirely.
+
 === EVIDENCE STANDARD ===
 If there’s no evidence, use:
   quote: "Not discussed in the transcript."

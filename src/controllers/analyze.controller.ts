@@ -44,6 +44,8 @@ export async function analyzeController(req: Request, res: Response) {
   const callType = asNullableString(req.body?.callType);
   const analysisFocus = asNullableString(req.body?.analysisFocus);
   const priorContext = asNullableString(req.body?.priorContext);
+  const dealTypeRaw = asNullableString(req.body?.dealType);
+  const dealType = dealTypeRaw === "smb" ? "smb" as const : dealTypeRaw === "enterprise" ? "enterprise" as const : null;
 
   // Context (middlewares)
   const userId = (req as any)?.auth?.userId as string | undefined;
@@ -57,6 +59,7 @@ export async function analyzeController(req: Request, res: Response) {
       callType,
       analysisFocus,
       priorContext,
+      dealType,
     });
 
     // Guardar resultado (sin transcript)
